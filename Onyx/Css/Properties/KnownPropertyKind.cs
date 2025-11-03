@@ -1,0 +1,177 @@
+﻿namespace Onyx.Css.Properties
+{
+	public enum KnownPropertyKind : ushort
+	{
+		Unknown = 0,
+
+		AlignContent,
+		AlignItems,
+		AlignSelf,
+
+		Azimuth,
+
+		BackgroundAttachment,
+		BackgroundColor,
+		BackgroundImage,
+		BackgroundPosition,
+		BackgroundOrigin,
+		BackgroundRepeat,
+		BackgroundSize,
+		Background,
+
+		BorderCollapse,
+		BorderColor,
+		BorderSpacing,
+		BorderStyle,
+		BorderTop,
+		BorderRight,
+		BorderBottom,
+		BorderLeft,
+		BorderTopColor,
+		BorderRightColor,
+		BorderBottomColor,
+		BorderLeftColor,
+		BorderTopStyle,
+		BorderRightStyle,
+		BorderBottomStyle,
+		BorderLeftStyle,
+		BorderTopWidth,
+		BorderRightWidth,
+		BorderBottomWidth,
+		BorderLeftWidth,
+		BorderWidth,
+		BorderTopLeftRadius,
+		BorderTopRightRadius,
+		BorderBottomLeftRadius,
+		BorderBottomRightRadius,
+		BorderRadius,
+		Border,
+
+		Bottom,
+		BoxShadow,
+		BoxSizing,
+		CaptionSide,
+		Clear,
+		Clip,
+		Color,
+		Content,
+
+		CounterIncrement,
+		CounterReset,
+
+		CueAfter,
+		CueBefore,
+		Cue,
+
+		Cursor,
+
+		Direction,
+		Display,
+		Elevation,
+		EmptyCells,
+
+		Flex,
+		FlexBasis,
+		FlexDirection,
+		FlexGrow,
+		FlexFlow,
+		FlexShrink,
+		FlexWrap,
+
+		Float,
+
+		FontFamily,
+		FontSize,
+		FontStyle,
+		FontWeight,
+		FontVariant,
+		Font,
+
+		Height,
+		JustifyContent,
+		Left,
+		LetterSpacing,
+		LineHeight,
+
+		ListStyleImage,
+		ListStylePosition,
+		ListStyleType,
+		ListStyle,
+
+		MarginTop,
+		MarginRight,
+		MarginBottom,
+		MarginLeft,
+		Margin,
+
+		MaxHeight,
+		MaxWidth,
+		MinHeight,
+		MinWidth,
+
+		Order,
+		Orphans,
+
+		OutlineColor,
+		OutlineOffset,
+		OutlineStyle,
+		OutlineWidth,
+		Outline,
+
+		Overflow,
+		OverflowX,
+		OverflowY,
+
+		PaddingTop,
+		PaddingRight,
+		PaddingBottom,
+		PaddingLeft,
+		Padding,
+
+		PageBreakAfter,
+		PageBreakBefore,
+		PageBreakInside,
+
+		PauseAfter,
+		PauseBefore,
+		Pause,
+
+		PitchRange,
+		Pitch,
+
+		PlayDuring,
+		Position,
+		Quotes,
+		Resize,
+		Richness,
+		Right,
+
+		SpeakHeader,
+		SpeakNumeral,
+		SpeakPunctuation,
+		Speak,
+		SpecialFont,
+		SpeechRate,
+		Stress,
+
+		TableLayout,
+
+		TextAlign,
+		TextDecoration,
+		TextIndent,
+		TextShadow,
+		TextTransform,
+
+		Top,
+		UnicodeBidi,
+		VerticalAlign,
+		Visibility,
+		VoiceFamily,
+		Volume,
+		WhiteSpace,
+		Widows,
+		Width,
+		WordSpacing,
+		ZIndex,
+	}
+}
