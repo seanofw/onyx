@@ -795,10 +795,22 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
-		/// Whether this container can be modified.
+		/// Whether this container's collection of children can be modified.  Not all containers
+		/// allow children to be added (an ImageElement, for example, is an Element, which is a
+		/// ContainerNode, but the &lt;img&gt; element does not allow child nodes to exist inside it).
 		/// </summary>
-		bool ICollection<Node>.IsReadOnly
-			=> (RenderFlags & RenderFlags.ReadOnlyContainer) != 0;
+		public bool IsReadOnly
+		{
+			get => (RenderFlags & RenderFlags.ReadOnlyContainer) != 0;
+
+			protected set
+			{
+				if (value)
+					RenderFlags |= RenderFlags.ReadOnlyContainer;
+				else
+					RenderFlags &= ~RenderFlags.ReadOnlyContainer;
+			}
+		}
 
 		/// <summary>
 		/// Enumerate the children of this node, lazily.
