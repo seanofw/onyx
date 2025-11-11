@@ -9,39 +9,9 @@ namespace Onyx.Html.Dom
 	/// children (including Element and Document).  This implements all of the necessary
 	/// DOM-like mechanics and events for a Node to really be part of a tree.
 	/// </summary>
-	public abstract class ContainerNode : Node
+	public abstract class ContainerNode : Node, IList<Node>
 	{
-		#region Tree references
-
-		/// <summary>
-		/// The children of this container, as an immutable list.  (Use methods on this
-		/// node to modify it.)
-		/// </summary>
-		public override IReadOnlyList<Node> ChildNodes => _children ?? (IReadOnlyList<Node>)Array.Empty<Node>();
-
-		/// <summary>
-		/// The children of this container, as an immutable list.  (Use methods on this
-		/// node to modify it.)
-		/// </summary>
-		public IReadOnlyList<Node> Children => _children ?? (IReadOnlyList<Node>)Array.Empty<Node>();
-
-		/// <summary>
-		/// The number of immediate children of this container.
-		/// </summary>
-		public override int ChildElementCount => _childElementCount;
-		private int _childElementCount;
-
-		/// <summary>
-		/// The count of descendant NODES of this node, including this node itself.
-		/// </summary>
-		public override int SubtreeNodeCount => _subtreeNodeCount;
-		private int _subtreeNodeCount;
-
-		/// <summary>
-		/// The count of descendant ELEMENTS of this node, including this node itself.
-		/// </summary>
-		public override int SubtreeElementCount => _subtreeElementCount;
-		private int _subtreeElementCount;
+		#region Private fields with storage
 
 		/// <summary>
 		/// The actual internal storage of the children, as a list whose internal storage
@@ -50,14 +20,48 @@ namespace Onyx.Html.Dom
 		private NodeList<Node>? _children;
 
 		/// <summary>
-		/// The first child of this container.
+		/// The number of immediate children of this container that are ELEMENTS.
 		/// </summary>
-		public override Node? FirstChild => _children != null ? _children[0] : null;
+		private int _childElementCount;
 
 		/// <summary>
-		/// The last child of this container.
+		/// The count of descendant NODES of this node, including this node itself.
 		/// </summary>
-		public override Node? LastChild => _children != null ? _children[_children.Count - 1] : null;
+		private int _subtreeNodeCount;
+
+		/// <summary>
+		/// The count of descendant ELEMENTS of this node, including this node itself.
+		/// </summary>
+		private int _subtreeElementCount;
+
+		#endregion
+
+		#region Tree properties
+
+		/// <summary>
+		/// The children of this container, as an immutable list.  This is an alternate
+		/// name for the JS DOM ChildNodes property, but is slightly shorter and more readable.
+		/// (Use methods on this ContainerNode to modify this collection.)
+		/// </summary>
+		public IReadOnlyList<Node> Children => _children ?? (IReadOnlyList<Node>)Array.Empty<Node>();
+
+		/// <summary>
+		/// The number of immediate children of this container that are ELEMENTS.
+		/// Equivalent to Children.Count(e => e is Element) but returns in O(1) time.
+		/// </summary>
+		public override int ChildElementCount => _childElementCount;
+
+		/// <summary>
+		/// The count of descendant NODES of this node, including this node itself.
+		/// Equivalent to recursively counting the nodes in this subtree, but returns in O(1) time.
+		/// </summary>
+		public override int SubtreeNodeCount => _subtreeNodeCount;
+
+		/// <summary>
+		/// The count of descendant ELEMENTS of this node, including this node itself.
+		/// Equivalent to recursively counting the ELEMENTS in this subtree, but returns in O(1) time.
+		/// </summary>
+		public override int SubtreeElementCount => _subtreeElementCount;
 
 		/// <summary>
 		/// The number of child nodes contained by this container.  (This is children,
@@ -67,23 +71,27 @@ namespace Onyx.Html.Dom
 
 		#endregion
 
-		#region Construction
+		#region DOM properties
 
 		/// <summary>
-		/// Construct a new container.
+		/// JS DOM: The children of this container, as an immutable list.  This property
+		/// is provided for JS DOM compatibility, and is equivalent to the Children property,
+		/// but it's slightly longer and less readable.
 		/// </summary>
-		protected ContainerNode()
-		{
-			_subtreeNodeCount = 1;
-			_subtreeElementCount = this is Element ? 1 : 0;
-		}
-
-		#endregion
-
-		#region Overrides
+		public override IReadOnlyList<Node> ChildNodes => Children;
 
 		/// <summary>
-		/// Reading the TextContent will provide the combined text of all child nodes.
+		/// JS DOM: The first child of this container.
+		/// </summary>
+		public override Node? FirstChild => _children != null ? _children[0] : null;
+
+		/// <summary>
+		/// JS DOM: The last child of this container.
+		/// </summary>
+		public override Node? LastChild => _children != null ? _children[_children.Count - 1] : null;
+
+		/// <summary>
+		/// JS DOM: Reading the TextContent will provide the combined text of all child nodes.
 		/// Writing the TextContent will replace all child nodes with the provided string.
 		/// </summary>
 		public override string TextContent
@@ -98,7 +106,7 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
-		/// Reading the InnerHtml property will produce equivalent HTML to that which was used
+		/// JS DOM: Reading the InnerHtml property will produce equivalent HTML to that which was used
 		/// to create all descendant nodes.  Writing the InnerHtml property will parse the given HTML
 		/// text and then replace all descendant nodes of this container with the parsed nodes.
 		/// </summary>
@@ -121,7 +129,7 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
-		/// Reading the OuterHtml property will produce equivalent HTML to that which was used
+		/// JS DOM: Reading the OuterHtml property will produce equivalent HTML to that which was used
 		/// to create this node and all of its descendants.  Writing the OuterHtml property will
 		/// parse the given HTML text, and will then replace *this* node itself with the resulting
 		/// node(s), if and only if the immediate parent of this node is a ContainerNode.
@@ -144,7 +152,20 @@ namespace Onyx.Html.Dom
 
 		#endregion
 
-		#region High-level collection-modification functions
+		#region Construction
+
+		/// <summary>
+		/// Construct a new container.
+		/// </summary>
+		protected ContainerNode()
+		{
+			_subtreeNodeCount = 1;
+			_subtreeElementCount = this is Element ? 1 : 0;
+		}
+
+		#endregion
+
+		#region High-level collection-manipulation functions
 
 		/// <summary>
 		/// Access this container's children as an ordinary C# list.
@@ -154,6 +175,8 @@ namespace Onyx.Html.Dom
 		/// <returns>The current child at the given index.</returns>
 		/// <exception cref="ArgumentOutOfRangeException">Thrown if the index is not
 		/// within the range of children of this container.</exception>
+		/// <exception cref="InvalidOperationException">Thrown if the container node
+		/// cannot be modified.</exception>
 		public Node this[int index]
 		{
 			get
@@ -170,7 +193,7 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
-		/// Append a child node to the end of this container.  If the node is already attached to the
+		/// JS DOM: Append a child node to the end of this container.  If the node is already attached to the
 		/// tree, it will be detached first (in O(n) time).  Otherwise, this runs in O(1) for small
 		/// containers, O(lg n) for large containers.
 		/// </summary>
@@ -181,16 +204,9 @@ namespace Onyx.Html.Dom
 		/// <exception cref="HierarchyException">Thrown if this insertion would create a cycle in the tree.</exception>
 		public override void AppendChild(Node child)
 		{
-			if (child is null)
-				throw new ArgumentNullException(nameof(child), "Child node must not be null.");
-
-			if (!(child is Element
-				|| child is TextNode
-				|| child is CommentNode))
-				throw new ArgumentException(nameof(child), "Every child of a ContainerNode must be an Element, a TextNode, or a CommentNode.");
-
-			if (ReferenceEquals(child, this) || child.ContainsOrIs(this))
-				throw new HierarchyException("Cannot create cycle in DOM tree.");
+			ThrowIfReadOnly();
+			ThrowIfInvalidChild(child);
+			ThrowIfCycle(child);
 
 			if (child.Parent is not null)
 				child.Parent.RemoveChild(child);
@@ -227,14 +243,14 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
-		/// Return whether this has child nodes (O(1) lookup).
+		/// JS DOM: Return whether this has child nodes (O(1) lookup).
 		/// </summary>
 		/// <returns>True if this has child nodes, false if it does not.</returns>
 		public override bool HasChildNodes()
 			=> _children?.Count != 0;
 
 		/// <summary>
-		/// Insert the given node before another reference node that is known to already be a child
+		/// JS DOM: Insert the given node before another reference node that is known to already be a child
 		/// of this container.  If the node is already attached to the tree, it will be detached first
 		/// (in O(n) time).  Otherwise, this runs in O(1) for small containers, O(lg n) for large containers.
 		/// </summary>
@@ -254,19 +270,10 @@ namespace Onyx.Html.Dom
 				return;
 			}
 
-			if (newNode is null)
-				throw new ArgumentNullException(nameof(newNode), "Child node must not be null.");
-
-			if (!(newNode is Element
-				|| newNode is TextNode
-				|| newNode is CommentNode))
-				throw new ArgumentException(nameof(newNode), "Every child of a ContainerNode must be an Element, a TextNode, or a CommentNode.");
-
-			if (ReferenceEquals(newNode, this) || newNode.ContainsOrIs(this))
-				throw new HierarchyException("Cannot create cycle in DOM tree.");
-
-			if (!ContainsOrIs(referenceNode))
-				throw new HierarchyException("Reference node is not a child of this container.");
+			ThrowIfReadOnly();
+			ThrowIfInvalidChild(newNode);
+			ThrowIfCycle(newNode);
+			ThrowIfWrongParent(referenceNode);
 
 			if (newNode.Parent is not null)
 				newNode.Parent.RemoveChild(newNode);
@@ -296,16 +303,9 @@ namespace Onyx.Html.Dom
 				return;
 			}
 
-			if (newNode is null)
-				throw new ArgumentNullException(nameof(newNode), "Child node must not be null.");
-
-			if (!(newNode is Element
-				|| newNode is TextNode
-				|| newNode is CommentNode))
-				throw new ArgumentException(nameof(newNode), "Every child of a ContainerNode must be an Element, a TextNode, or a CommentNode.");
-
-			if (ReferenceEquals(newNode, this) || newNode.ContainsOrIs(this))
-				throw new HierarchyException("Cannot create cycle in DOM tree.");
+			ThrowIfInvalidChild(newNode);
+			ThrowIfCycle(newNode);
+			ThrowIfReadOnly();
 
 			if (newNode.Parent is not null)
 				newNode.Parent.RemoveChild(newNode);
@@ -357,18 +357,16 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
-		/// Remove this child from this parent.  Runs in O(n) time.
+		/// JS DOM: Remove this child from this parent.  Runs in O(n) time.
 		/// </summary>
 		/// <param name="child">The child to detach.</param>
 		/// <exception cref="ArgumentNullException">Thrown if the child node is null.</exception>
 		/// <exception cref="HierarchyException">Thrown if the given node is not a child of this container.</exception>
 		public override void RemoveChild(Node child)
 		{
-			if (child is null)
-				throw new ArgumentNullException(nameof(child), "Child node must not be null.");
-
-			if (!ReferenceEquals(child.Parent, this))
-				throw new HierarchyException("Node does not have this container node as its parent.");
+			ThrowIfInvalidChild(child);
+			ThrowIfWrongParent(child);
+			ThrowIfReadOnly();
 
 			Node.OnDetaching(this, child);
 
@@ -401,8 +399,8 @@ namespace Onyx.Html.Dom
 		/// inclusive.</param>
 		public void RemoveAt(int index)
 		{
-			if (index < 0 || index >= (_children?.Count ?? 0))
-				throw new ArgumentOutOfRangeException(nameof(index), "Child node index is out of range.");
+			ThrowIfIndexOutOfRange(index);
+			ThrowIfReadOnly();
 
 			Node child = _children![index];
 
@@ -426,7 +424,7 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
-		/// Remove the given reference node from this container's children, and insert the given
+		/// JS DOM: Remove the given reference node from this container's children, and insert the given
 		/// new node in its place.  This is more efficient than InsertBefore+RemoveChild, not just
 		/// replacing two calls with one, but more efficient under the hood too, avoiding the O(n)
 		/// overhead of RemoveChild.  If the new node is already attached to the tree, it will be
@@ -448,19 +446,10 @@ namespace Onyx.Html.Dom
 				return;
 			}
 
-			if (newNode is null)
-				throw new ArgumentNullException(nameof(newNode), "Child node must not be null.");
-
-			if (!(newNode is Element
-				|| newNode is TextNode
-				|| newNode is CommentNode))
-				throw new ArgumentException(nameof(newNode), "Every child of a ContainerNode must be an Element, a TextNode, or a CommentNode.");
-
-			if (ReferenceEquals(newNode, this) || newNode.ContainsOrIs(this))
-				throw new HierarchyException("Cannot create cycle in DOM tree.");
-
-			if (!ContainsOrIs(referenceNode))
-				throw new HierarchyException("Reference node is not a child of this container.");
+			ThrowIfReadOnly();
+			ThrowIfInvalidChild(newNode);
+			ThrowIfCycle(newNode);
+			ThrowIfWrongParent(referenceNode);
 
 			if (newNode.Parent is not null)
 				newNode.Parent.RemoveChild(newNode);
@@ -487,24 +476,15 @@ namespace Onyx.Html.Dom
 		/// or if the reference node is not a child of this container.</exception>
 		public void ReplaceChild(int index, Node newNode)
 		{
-			if (newNode is null)
-				throw new ArgumentNullException(nameof(newNode), "Child node must not be null.");
-
-			if (!(newNode is Element
-				|| newNode is TextNode
-				|| newNode is CommentNode))
-				throw new ArgumentException(nameof(newNode), "Every child of a ContainerNode must be an Element, a TextNode, or a CommentNode.");
-
-			if (ReferenceEquals(newNode, this) || newNode.ContainsOrIs(this))
-				throw new HierarchyException("Cannot create cycle in DOM tree.");
-
-			if (_children == null)
-				throw new ArgumentOutOfRangeException(nameof(index), "Index is not within the range of valid nodes.");
+			ThrowIfReadOnly();
+			ThrowIfInvalidChild(newNode);
+			ThrowIfCycle(newNode);
+			ThrowIfIndexOutOfRange(index);
 
 			if (newNode.Parent is not null)
 				newNode.Parent.RemoveChild(newNode);
 
-			ReplaceChildFastAndUnsafe(newNode, _children[index]);
+			ReplaceChildFastAndUnsafe(newNode, _children![index]);
 		}
 
 		/// <summary>
@@ -540,7 +520,7 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
-		/// Normalize text nodes in this container and in all deeper subtrees:
+		/// JS DOM: Normalize text nodes in this container and in all deeper subtrees:
 		/// Any adjacent text nodes are joined, and any empty text nodes are removed.
 		/// </summary>
 		public override void Normalize()
@@ -548,8 +528,10 @@ namespace Onyx.Html.Dom
 			if (_children == null)
 				return;
 
+			ThrowIfReadOnly();
+
 			int dest = 0;
-			for (int src = 0; src < _children.Count; )
+			for (int src = 0; src < _children.Count;)
 			{
 				Node child = _children[src], next;
 				if (child.NodeType == NodeType.Text)
@@ -595,6 +577,8 @@ namespace Onyx.Html.Dom
 			if (_children == null)
 				return;
 
+			ThrowIfReadOnly();
+
 			for (int i = _children.Count - 1; i >= 0; i--)
 			{
 				_children[i].Parent = null;
@@ -614,12 +598,13 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
-		/// Find the index of the child in this container.
+		/// Find the index of the given child in this container.  This is like a search,
+		/// but takes advantage of the child's data to run in O(1) time.
 		/// </summary>
 		/// <param name="child">The child to search for.</param>
 		/// <returns>The index of the child, or -1 if the child was not found.</returns>
 		public int IndexOf(Node child)
-			=> child.Parent == this ? child.Index : -1;
+			=> ReferenceEquals(child.Parent, this) ? child.Index : -1;
 
 		#endregion
 
@@ -759,6 +744,147 @@ namespace Onyx.Html.Dom
 			return (nodeCount, elementCount);
 		}
 #endif
+
+		#endregion
+
+		#region IList<Node> implementation
+
+		/// <summary>
+		/// Append a child node to the end of this container.  If the node is already attached to the
+		/// tree, it will be detached first (in O(n) time).  Otherwise, this runs in O(1) for small
+		/// containers, O(lg n) for large containers.
+		/// </summary>
+		/// <param name="child">The child to append.</param>
+		/// <exception cref="ArgumentNullException">Thrown if the child is null.</exception>
+		/// <exception cref="ArgumentException">Thrown if the child is not a valid type of node to append
+		/// (for example, element nodes may only contain TextNodes, CommentNodes, and other Elements).</exception>
+		/// <exception cref="HierarchyException">Thrown if this insertion would create a cycle in the tree.</exception>
+		void ICollection<Node>.Add(Node node)
+			=> AppendChild(node);
+
+		/// <summary>
+		/// Answer whether this collection's children contain the given node.
+		/// </summary>
+		/// <param name="node">The node to test to see if it is an immediate child of this parent.</param>
+		/// <returns>True if the given node is an immediate child of this parent, false if it is not.</returns>
+		bool ICollection<Node>.Contains(Node? node)
+			=> node is not null && ReferenceEquals(node.Parent, this);
+
+		/// <summary>
+		/// Copy the child nodes of this node to the given array.
+		/// </summary>
+		/// <param name="array">The destination array to copy to.</param>
+		/// <param name="arrayIndex">The starting index to copy at.</param>
+		void ICollection<Node>.CopyTo(Node[] array, int arrayIndex)
+		{
+			foreach (Node node in Children)
+				array[arrayIndex++] = node;
+		}
+
+		/// <summary>
+		/// Remove this child from this parent.  Runs in O(n) time.
+		/// </summary>
+		/// <param name="child">The child to detach.</param>
+		/// <returns>True if the child was removed, false if the given node was not a child of this parent.</returns>
+		bool ICollection<Node>.Remove(Node? node)
+		{
+			if (node is null || !ReferenceEquals(node.Parent, this))
+				return false;
+			RemoveChild(node);
+			return true;
+		}
+
+		/// <summary>
+		/// Whether this container can be modified.
+		/// </summary>
+		bool ICollection<Node>.IsReadOnly
+			=> (RenderFlags & RenderFlags.ReadOnlyContainer) != 0;
+
+		/// <summary>
+		/// Enumerate the children of this node, lazily.
+		/// </summary>
+		/// <returns>An enumerator that yields the children of this node.</returns>
+		/// <remarks>Note: Modifying this container during enumeration will yield unpredictable
+		/// results.  Do not modify this container while an enumeration is active.</remarks>
+		public IEnumerator<Node> GetEnumerator()
+			=> Children.GetEnumerator();
+
+		/// <summary>
+		/// Enumerate the children of this node, lazily.
+		/// </summary>
+		/// <returns>An enumerator that yields the children of this node.</returns>
+		/// <remarks>Note: Modifying this container during enumeration will yield unpredictable
+		/// results.  Do not modify this container while an enumeration is active.</remarks>
+		System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+			=> Children.GetEnumerator();
+
+		#endregion
+
+		#region Throw helpers
+
+		/// <summary>
+		/// If this container node is marked as ReadOnly, throw an exception.
+		/// </summary>
+		/// <exception cref="InvalidOperationException">Thrown if the container node
+		/// cannot be modified.</exception>
+		protected void ThrowIfReadOnly()
+		{
+			if ((RenderFlags & RenderFlags.ReadOnlyContainer) != 0)
+				throw new InvalidOperationException("Container node's children are not modifiable.");
+		}
+
+		/// <summary>
+		/// If the given child-to-be is not valid, throw an exception.
+		/// </summary>
+		/// <param name="child">The child to test.</param>
+		/// <exception cref="ArgumentNullException">Thrown if the new child node is null.</exception>
+		/// <exception cref="ArgumentException">Thrown if the child is not a valid type of node to append
+		/// (for example, element nodes may only contain TextNodes, CommentNodes, and other Elements).</exception>
+		protected void ThrowIfInvalidChild(Node child)
+		{
+			if (child is null)
+				throw new ArgumentNullException(nameof(child), "Child node must not be null.");
+
+			if (!(child is Element
+				|| child is TextNode
+				|| child is CommentNode))
+				throw new ArgumentException(nameof(child), "Every child of a ContainerNode must be an Element, a TextNode, or a CommentNode.");
+		}
+
+		/// <summary>
+		/// If the given node is not a child of this node, throw an exception.
+		/// </summary>
+		/// <param name="child">The child to test.</param>
+		/// <exception cref="HierarchyException">Thrown if the given node is not a child of this container.</exception>
+		protected void ThrowIfWrongParent(Node child)
+		{
+			if (!ReferenceEquals(child.Parent, this))
+				throw new HierarchyException("Reference node is not a child of this container.");
+		}
+
+		/// <summary>
+		/// Test to see whether adding the given node as a child would create a cycle in the
+		/// tree.  If so, throw an exception.
+		/// </summary>
+		/// <param name="child">The child to test.</param>
+		/// <exception cref="HierarchyException">Thrown if this insertion would create a cycle in the tree.</exception>
+		protected void ThrowIfCycle(Node child)
+		{
+			if (ReferenceEquals(child, this) || child.ContainsOrIs(this))
+				throw new HierarchyException("Cannot create cycle in DOM tree.");
+		}
+
+		/// <summary>
+		/// If the given index is not within the range of valid indices of child nodes of
+		/// this container, throw an exception.
+		/// </summary>
+		/// <param name="index">The index to test.</param>
+		/// <exception cref="ArgumentOutOfRangeException">Thrown if the index is not in range.</exception>
+		protected void ThrowIfIndexOutOfRange(int index)
+		{
+			if (index < 0 || index >= (_children?.Count ?? 0))
+				throw new ArgumentOutOfRangeException(nameof(index), "Child node index is out of range.");
+		}
 
 		#endregion
 	}
