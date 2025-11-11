@@ -146,7 +146,71 @@ Each of these should work as defined by web standards.  If they do not, please r
 * `white-space`, `widows`, `word-spacing`
 * `z-index`
 
-## The DOM
+## C# APIs
+
+Onyx's APIs are designed to mimic the DOM where reasonable, but we use standard .NET constructs where we can, like `Dictionary<K, V>` and `List<T>`.
+
+Onyx has a lot of classes inside, but these are the core classes you're likely to care about the most:
+
+**DOM Tree**
+
+* `Document` - The root of any tree of nodes (elements).  Loosely equivalent to the JS `document` object, but has far less attached to it, and is *not* a singleton.
+* `Node` - The base class of both `Element` and `TextNode` and `CommentNode` and more, this is simply a part of a document tree.  Note that unlike with the JS DOM, attributes do *not* inherit from `Node`.
+* `TextNode` - A leaf node that contains a string of text.
+* `ContainerNode` - The abstract base class of `Element` and `Document`, this represents any node that can contain other nodes, and provides a `ChildNodes` collection and add/removal mechanics.
+* `Element` - Every layout area of a document is represented by an element, just like with the JS DOM.
+* `LeafElement` - A special child class of `Element` that prohibits child nodes from being added.  This is the abstract base class of objects like `ImageElement` and `InputElement` and `ButtonElement`.
+
+**HTML Parsing**
+ 
+* `HtmlParser` - This is a full, standards-compliant HTML parser.  It uses `HtmlLexer` to read a sequence of tokens, and constructs a `Document` object from them and returns it.
+* `HtmlLexer` - The lexer eats HTML, both plain text and tags, and it returns the next `HtmlToken` in the document each time `Next()` is called.  Attributes are parsed, but tags are just returned as tags, not as `Element` objects.
+* `HtmlToken` - One of these objects is returned on each invocation of the lexer.  It has a `SourceLocation` attached to it indicating which source file and line it came from.  This class is immutable.
+* `SourceLocation` - A representation of a location in a source file, including file name, line number, column, and length.  This class is immutable.
+
+**CSS Parsing**
+
+* `CssParser` - This is a full, standards-compliant CSS 2.1 parser (with some CSS 3 support).  It uses `CssLexer` to read a sequence of tokens, and constructs a `Stylesheet` object from them and returns it.  This can correctly handle/ignore bad property and value declarations.
+* `CssSelectorParser` - This knows how to parse *just* a single selector into a `Selector` or a `CompoundSelector` object.
+* `CssPropertyParser` - This knows how to parse *just* a single CSS property declaration into a `StyleProperty` object.
+* `CssLexer` - The lexer eats CSS, and returns it as a sequence of `CssToken` objects.
+
+**CSS Styles**
+
+* `Stylesheet` - A set of zero or more `StyleRule` objects, in declaration order.
+* `StyleRule` - This is a pairing of a `CompoundSelector` with a `StylePropertySet`, representing a single "rule" in a stylesheet.
+* `StyleProperty` - This is the abstract base class for a single CSS property declaration.  Properties are strongly-typed, so this will actually be any of a hundred different classes or so, like `BorderColorProperty` or `DisplayProperty`.  This class and all its descendants are immutable.  Instances of this class have a `SourceLocation`, and they can be `ToString()`ed back to CSS text equivalent to that which was parsed.
+* `StylePropertySet` - A set of zero or more `StyleProperty` objects, optimized for reading, not modification.  This class is immutable.
+* `ComputedStyle` - A copy-on-write tree of data that represents the "final" computed style for any element.  This class is immutable.
+* `StyleManager` - This tracks which `Stylesheet` objects are loaded for a given `Document`, and provides optimized lookup structures for styles.
+
+**Selectors**
+
+* `CompoundSelector` - This is a collection of one or more `Selector` objects (comma-separated).  This class is immutable.
+* `Selector` - This represents a single CSS-style selector, and provides an optimized matching engine to test elements against it.  This contains one or more `SimpleSelector` objects, separated by `Combinator` tokens like space and `>` and `+` and `~`.  It has a `Specificity` that can be compared against the `Specificity` of other selectors.  This class is immutable.
+* `SimpleSelector` - This matches an element by testing various properties and attributes on the element itself.  It may have an `ElementName`, and may have zero or more `SelectorFilter` objects.  This class is immutable.
+* `SelectorFilter` - This matches an element by testing various properties and attributes on the element itself, *not* including the element's name.  This is an abstract base class, and will be one of several child types, like `SelectorFilterId` or `SelectorFilterAttrib` or `SelectorPseudoClass`.
+
+Selectors can also be invoked via methods on `Document` and `Element`, like `Document.Find(string selector)` and `Element.IsMatch(string selector)` and by `IEnumerable<T>` extensions, like `IEnumerable<Element>.Where(string selector)`.
+
+**Miscellaneous Types**
+
+* `Measure` - This is a pairing of a `Unit` (like `em` or `px`) with a `double` value.  It is a readonly struct type.  This provides common operators like `+` and `*` and `==` and `<`.
+* `Message` and `Messages` - A `Messages` collection holds errors and warnings from different kinds of parsers, in the form of `Message` objects, each of which have a `Kind`, a `SourceLocation`, and the `Text` of the message itself.  `Message` is an immutable type.  **`Messages` is thread-safe.**
+* `HtmlEntities` - This provides complete mapping tables for all known HTML `&entity;` declarations, and conversion methods.
+* `StringExtensions` - This provides methods to convert HTML entities (`HtmlEncode()` and `HtmlDecode()`) and C-style backslash escapes (`AddCSlashes()` and `StripCSlashes()`) to plain text, and vice-versa.  This also provides functions to convert `TitleCase` identifiers to `hy-phen-ized` identifiers (`Hyphenize()` and `Titleize()`).
+
+### Threading concerns
+
+**Classes in Onyx are *not* thread safe.**  Do not manipulate an object in Onyx from multiple threads at once.  Bad things will happen.
+
+However, classes don't have a thread *affinity* either — there's no such thing as "the UI thread."  It's your responsibility to ensure that a `Document` tree isn't being stomped on by multiple threads at once, but `Document` and everything under it can safely be owned by any thread — and ownership can be transferred to a thread that the object wasn't created on.  The same threading rules apply to Onyx classes that apply to something like `Dictionary<K, V>` or `List<T>`:  It doesn't matter which thread modifies the object tree as long as it's only one thread at a time.
+
+Future versions of Onyx may offer enhanced thread-safety to allow more flexibility in the "do not share objects" rule, but right now, assume all objects are not thread safe.
+
+Note that many Onyx classes are immutable, and the immutable classes are therefore thread-safe.  A `Stylesheet`, for example, is an immutable object, and can be safely shared across threads or tasks.
+
+### The DOM
 
 Onyx targets compatibility with HTML and CSS, but it explicitly does *not* target compatibility with the traditional DOM.  Onyx's DOM is similar, but is more streamlined.  Some legacy APIs have been removed, and new APIs have been added, and Onyx goes out of its way to provide Linq compatibility for easy element analysis and traversal.
 
@@ -158,7 +222,8 @@ Major differences include:
 * Elements have no `GetAttributeBy()`/`SetAttribute()` methods; they just have an `Attributes` property that implements `IDictionary<string, Attribute>`.
 * Any `IEnumerable<Element>` has many useful query methods, like `Find(selector)` and `Where(selector)` and `Closest(selector)` and `Descendants()` and `Ancestors()`, often obviating the need for using `ChildNodes`/`ParentNode`/`NextSibling`/`PreviousSibling` directly.
 * The `Classname` property is still whitespace-separated, but there is also a `Classnames` property that is an `IReadOnlySet<string>`, and `AddClass()` and `RemoveClass()` and `HasClass()` are first-class methods on individual `Elements` — and on collections.
-* `Document` is intentionally a simple container — unlike in the normal DOM, it's not very special or very complex or even necessarily the root of the element tree.
+* `Document` is intentionally a simple container — unlike in the normal DOM, it's not very special or very complex or even necessarily the root of the element tree. `Document` is a `ContainerNode`, so it can host more than one child, not just a `<body>` element.
+* `DocumentFragment` is just `Document` minus all fast-selector-lookup logic.
 * Methods that return elements rarely return them in document order, for performance reasons:  If you actually need document order for any collection of elements, there is an `.OrderByPosition()` extension method on `IEnumerable<Element>`.
 
 All of these differences are designed to simplify working with the DOM in modern C# by stripping away old cruft, adding methods inspired by jQuery, and ensuring deep Linq compatibility — in many cases, these changes allow complicated JavaScript DOM manipulations to be reduced to simple Linq one-liners.
