@@ -5,7 +5,7 @@ namespace Onyx.Html.Dom
 	/// <summary>
 	/// A single comment in a document.
 	/// </summary>
-	public class CommentNode : LeafNode
+	public class CommentNode : SimpleNode
 	{
 		public override NodeType NodeType => NodeType.Comment;
 

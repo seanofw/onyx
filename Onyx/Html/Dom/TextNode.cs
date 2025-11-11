@@ -5,7 +5,7 @@ namespace Onyx.Html.Dom
 	/// <summary>
 	/// A single contiguous chunk of text in a document.
 	/// </summary>
-	public class TextNode : LeafNode
+	public class TextNode : SimpleNode
 	{
 		private string? _text;
 
