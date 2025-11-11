@@ -1,4 +1,4 @@
-﻿using Onyx.Css.Computed;
+using Onyx.Css.Computed;
 using Onyx.Css.Properties;
 using Onyx.Css.Selectors;
 using Onyx.Extensions;
@@ -6,6 +6,11 @@ using Onyx.Html.Dom;
 
 namespace Onyx.Css
 {
+	/// <summary>
+	/// A StyleManager tracks which stylesheets have been added to a document, and constructs
+	/// lookup tables and optimized execution plans that can apply those styles to an element
+	/// as efficiently as possible.
+	/// </summary>
 	public class StyleManager : IStyleManager
 	{
 		#region Properties and fields
@@ -82,8 +87,8 @@ namespace Onyx.Css
 		/// exception will be thrown.</param>
 		public void AddStylesheet(Stylesheet stylesheet)
 		{
-			if (stylesheet == null)
-				throw new ArgumentNullException(nameof(stylesheet));
+			ArgumentNullException.ThrowIfNull(stylesheet, nameof(stylesheet));
+
 			if (_stylesheets.Contains(stylesheet))
 				throw new ArgumentException("Cannot add duplicate stylesheet.");
 
@@ -108,8 +113,7 @@ namespace Onyx.Css
 		/// if it did not already exist.</returns>
 		public bool RemoveStylesheet(Stylesheet stylesheet)
 		{
-			if (stylesheet == null)
-				throw new ArgumentNullException(nameof(stylesheet));
+			ArgumentNullException.ThrowIfNull(stylesheet, nameof(stylesheet));
 
 			if (!_stylesheets.Remove(stylesheet))
 				return false;
@@ -136,14 +140,13 @@ namespace Onyx.Css
 		/// that are overridden are still included, and shorthand properties are not
 		/// expanded:  The returned collection is the "raw" style collection, with
 		/// the correct specificity to apply for each property set.</returns>
-		public IReadOnlyCollection<StylePropertyBag> GetStyleRules(Element element)
+		public IReadOnlyCollection<StylePropertySetWithSpecificity> GetStyleRules(Element element)
 		{
-			if (element == null)
-				throw new ArgumentNullException(nameof(element));
+			ArgumentNullException.ThrowIfNull(element, nameof(element));
 
 			HashSet<StyleRule> candidates = FindCandidateRules(element);
 
-			List<StylePropertyBag> result = new List<StylePropertyBag>();
+			List<StylePropertySetWithSpecificity> result = new List<StylePropertySetWithSpecificity>();
 
 			foreach (StyleRule rule in candidates)
 			{
@@ -160,7 +163,7 @@ namespace Onyx.Css
 
 				if (specificity != Specificity.Zero)
 				{
-					result.Add(new StylePropertyBag(rule.Properties, specificity));
+					result.Add(new StylePropertySetWithSpecificity(rule.Properties, specificity));
 				}
 			}
 
@@ -178,6 +181,8 @@ namespace Onyx.Css
 		/// this element.</returns>
 		private HashSet<StyleRule> FindCandidateRules(Element element)
 		{
+			ArgumentNullException.ThrowIfNull(element, nameof(element));
+
 			HashSet<StyleRule> candidates = new HashSet<StyleRule>(_genericIndex);
 
 			if (_idIndex.TryGetValue(element.Id, out List<StyleRule>? rules))
@@ -201,14 +206,25 @@ namespace Onyx.Css
 		/// <returns>The element's finished computed style.</returns>
 		public ComputedStyle ComputeStyle(Element element, ComputedStyle? parentStyle = null)
 		{
-			if (element == null)
-				throw new ArgumentNullException(nameof(element));
+			ArgumentNullException.ThrowIfNull(element, nameof(element));
 
-			IReadOnlyCollection<StylePropertyBag> styleRules = GetStyleRules(element);
+			// Look up the sets of styles that should be applied, with their specificities.
+			List<StylePropertySetWithSpecificity> styleRules = (List<StylePropertySetWithSpecificity>)GetStyleRules(element);
 
+			// If there are inline styles on this element, add those too.
+			StylePropertySet inlineStyles = element.InlineStyles;
+			if (inlineStyles.Count != 0)
+				styleRules.Add(new StylePropertySetWithSpecificity(inlineStyles, Specificity.MaxValue));
+
+			// Expand each shorthand property, organize the styles by specificity, and extract
+			// out only those styles for each property that have the highest specificity.
 			IReadOnlyCollection<StyleProperty> finalProperties = ExtractMostSpecificStyles(styleRules);
 
-			ComputedStyle computedStyle = parentStyle ?? ComputedStyle.Default;
+			// Start with the inheritable pieces from the parent's style, or a default set,
+			// if this doesn't have a parent style.
+			ComputedStyle computedStyle = parentStyle != null ? parentStyle.MakeChildStyle() : ComputedStyle.Default;
+
+			// Now generate the computed style by combining all of the most specific styles together.
 			foreach (StyleProperty styleProperty in finalProperties)
 			{
 				if (!styleProperty.HasSpecialApplication)
@@ -233,18 +249,21 @@ namespace Onyx.Css
 
 		/// <summary>
 		/// Given bags of style rules, each with their own specificity, reduce them down to *just*
-		/// the most specific property that should be applied for each kind of property.
+		/// the most specific property that should be applied for each kind of property, expanding
+		/// any shorthand properties in the process.
 		/// </summary>
 		/// <param name="stylePropertyBags">Bags of style properties, with their specificity determined.</param>
 		/// <returns>The most specific property of each kind from the given bag(s) of properties.
 		/// Each property kind will be represented exactly one.</returns>
 		private static IReadOnlyCollection<StyleProperty> ExtractMostSpecificStyles(
-			IEnumerable<StylePropertyBag> stylePropertyBags)
+			IEnumerable<StylePropertySetWithSpecificity> stylePropertyBags)
 		{
+			ArgumentNullException.ThrowIfNull(stylePropertyBags, nameof(stylePropertyBags));
+
 			Dictionary<KnownPropertyKind, StylePropertyPair> finalProperties
 				= new Dictionary<KnownPropertyKind, StylePropertyPair>();
 
-			foreach (StylePropertyBag bag in stylePropertyBags)
+			foreach (StylePropertySetWithSpecificity bag in stylePropertyBags)
 			{
 				Specificity specificity = bag.Specificity;
 				StylePropertySet stylePropertySet = bag.StylePropertySet;

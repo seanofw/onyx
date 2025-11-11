@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Onyx.Css.Selectors
@@ -10,7 +10,7 @@ namespace Onyx.Css.Selectors
 	{
 		// 666655555555554444444444333333333322222222221111111111
 		// 3210987654321098765432109876543210987654321098765432109876543210
-		// x...............................................................    A: Inline style or stylesheet
+		// x...............................................................    A: Inline style
 		// ..xxxxxxxxxx....................................................    B: IDs (0-1023)
 		// .............xxxxxxxxxx.........................................    C: Attributes (0-1023)
 		// ........................xxxxxxxxxx..............................    D: Elements (0-1023)
@@ -38,6 +38,8 @@ namespace Onyx.Css.Selectors
 			=> new Specificity(_value & ~0x8000_0000_3FFF_FFFFUL);
 
 		public static Specificity Zero { get; } = new Specificity(0);
+
+		public static Specificity MaxValue { get; } = new Specificity(0x8000_0000_0000_0000UL);
 
 		public Specificity() { }
 

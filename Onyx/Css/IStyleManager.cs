@@ -1,4 +1,4 @@
-﻿using Onyx.Css.Computed;
+using Onyx.Css.Computed;
 using Onyx.Css.Properties;
 using Onyx.Css.Selectors;
 using Onyx.Html.Dom;
@@ -66,7 +66,7 @@ namespace Onyx.Css
 		/// that are overridden are still included, and shorthand properties are not
 		/// expanded:  The returned collection is the "raw" style collection, with
 		/// the correct specificity to apply for each property set.</returns>
-		IReadOnlyCollection<StylePropertyBag> GetStyleRules(Element element);
+		IReadOnlyCollection<StylePropertySetWithSpecificity> GetStyleRules(Element element);
 
 		/// <summary>
 		/// Compute the style for the given element, inheriting it (as necessary or as requested)
