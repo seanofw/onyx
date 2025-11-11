@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Onyx.Css.Parsing;
@@ -169,8 +169,13 @@ namespace Onyx.Css.Selectors
 			{
 				// Test all possible sibling relationships.
 				SimpleSelector simpleSelector = Path[index].SimpleSelector;
-				for (Node? prev = node.Previous; prev != null; prev = prev.Previous)
+				ContainerNode? parent = node.Parent;
+				if (parent == null)
+					return false;
+				IReadOnlyList<Node> childNodes = parent.ChildNodes;
+				for (int i = node.Index - 1; i >= 0; i--)
 				{
+					Node prev = childNodes[i];
 					if (!(prev is Element element) || !simpleSelector.IsMatch(element))
 						continue;
 
@@ -180,8 +185,9 @@ namespace Onyx.Css.Selectors
 					if (RecursivelyTestPath(index - 1, Path[index - 1].Combinator, prev))
 						return true;
 				}
-				for (Node? next = node.Next; next != null; next = next.Next)
+				for (int i = node.Index + 1; i < childNodes.Count; i++)
 				{
+					Node next = childNodes[i];
 					if (!(next is Element element) || !simpleSelector.IsMatch(element))
 						continue;
 

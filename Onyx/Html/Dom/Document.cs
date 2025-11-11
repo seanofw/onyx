@@ -1,10 +1,15 @@
-﻿using System.Data;
 using System.Text;
 using Onyx.Css;
 using Onyx.Html.Parsing;
 
 namespace Onyx.Html.Dom
 {
+	/// <summary>
+	/// The root of the node tree.  Unlike in the JS DOM, this class is designed to be relatively
+	/// easy to replace with an alternate root like a DocumentFragment that implements similar
+	/// "root-like" functionality (but that may not necessary provide efficient lookups and queries
+	/// like this class does).
+	/// </summary>
 	public class Document : ContainerNode, IElementLookupContainer, IStyleRoot
 	{
 		ElementLookupTables IElementLookupContainer.ElementLookupTables => _elementLookupTables;
@@ -14,34 +19,14 @@ namespace Onyx.Html.Dom
 
 		public override NodeType NodeType => NodeType.Document;
 
-		public override string? Value
-		{
-			get => null;
-			set => throw new NotSupportedException();
-		}
-
-		public override string TextContent
-		{
-			get => string.Join("", Children.Select(c => c.TextContent));
-			set => throw new NotSupportedException();
-		}
-
+		/// <summary>
+		/// This property is a simple shorthand proxy for reading and writing the InnerHtml
+		/// property, but reads better when working with a Document.
+		/// </summary>
 		public string Html
 		{
-			get
-			{
-				StringBuilder stringBuilder = new StringBuilder();
-				foreach (Node child in Children)
-				{
-					child.ToString(stringBuilder);
-				}
-				return stringBuilder.ToString();
-			}
-
-			set
-			{
-				HtmlParser.ParseInnerHtml(value, this);
-			}
+			get => InnerHtml;
+			set => InnerHtml = value;
 		}
 
 		public IStyleManager StyleManager => _styleManager;
@@ -82,7 +67,16 @@ namespace Onyx.Html.Dom
 
 		public override Node CloneNode(bool deep = false)
 		{
-			throw new NotImplementedException();
+			Document clone = new Document();
+			clone.SourceLocation = SourceLocation;
+
+			foreach (Stylesheet stylesheet in StyleManager.Stylesheets)
+				clone.StyleManager.AddStylesheet(stylesheet);
+
+			if (deep)
+				CloneDescendantsTo(clone);
+
+			return clone;
 		}
 
 		public override void ToString(StringBuilder stringBuilder)

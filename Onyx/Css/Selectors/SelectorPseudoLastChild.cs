@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using System.Reflection;
 using Onyx.Html.Dom;
 
@@ -26,6 +26,6 @@ namespace Onyx.Css.Selectors
 				Expression.Constant(null));
 
 		public override bool IsMatch(Element element)
-			=> element.Next == null;
+			=> element.NextSibling == null;
 	}
 }

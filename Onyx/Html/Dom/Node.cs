@@ -1,35 +1,76 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Onyx.Css.Selectors;
 
 namespace Onyx.Html.Dom
 {
+	/// <summary>
+	/// This abstract base class represents a node --- an element, text, comment, or even
+	/// the document root itself --- in the document tree.
+	/// 
+	/// This contains two pointers (references) and two 32-bit integers of data:  That's
+	/// ~16 bytes on a 32-bit machine, and ~24 bytes on a 64-bit machine.  This is the
+	/// baseline overhead for all nodes --- fairly small, but not zero.
+	/// </summary>
 	[DebuggerDisplay("Node #{UniqueId}: {NodeName} (at {Index})")]
 	public abstract class Node
 	{
-		internal Node? Parent, Next, Previous;
-		internal ContainerNode? Root = null;
+		#region Properties and fields that store data
 
+		/// <summary>
+		/// The root of the tree this node belongs to, if any.
+		/// </summary>
+		internal ContainerNode? Root;
+
+		/// <summary>
+		/// The parent container node this node is attached under, if any.
+		/// </summary>
+		internal ContainerNode? Parent;
+
+		/// <summary>
+		/// A unique ID for this node, purely for debugging purposes.  This should *not*
+		/// be used for any purposes other than identifying nodes during debugging, as
+		/// it can and *will* roll over if enough nodes are allocated over time.  It is
+		/// marked [Obsolete] to help ensure you don't write code against it.
+		/// </summary>
+		[Obsolete]
+		public int UniqueId => _uniqueId;
+		private ushort _uniqueId;
 		private static int _uniqueIdSource = 0;
-		internal readonly int UniqueId = Interlocked.Increment(ref _uniqueIdSource);
 
+		/// <summary>
+		/// Flags controlling how this node is rendered.
+		/// </summary>
+		internal RenderFlags RenderFlags;
+
+		/// <summary>
+		/// Flags controlling how this node interacts with styling.
+		/// </summary>
+		internal StyleFlags StyleFlags;
+
+		/// <summary>
+		/// The zero-based position of this node in the array of its parents' children.
+		/// A negative number indicates that this node is not attached to a parent node.
+		/// </summary>
 		public int Index { get; internal set; } = -1;
+
+		#endregion
 
 		/// <summary>
 		/// The number of immediate-child elements this node contains.
 		/// </summary>
-		public int ChildElementCount { get; internal set; } = 0;
+		public virtual int ChildElementCount => 0;
 
 		/// <summary>
 		/// The count of descendant NODES of this node, including this node itself.
 		/// </summary>
-		public int SubtreeNodeCount { get; internal set; } = 1;
+		public virtual int SubtreeNodeCount => 1;
 
 		/// <summary>
 		/// The count of descendant ELEMENTS of this node, including this node itself.
 		/// </summary>
-		public int SubtreeElementCount { get; internal set; }
+		public virtual int SubtreeElementCount => 0;
 
 		/// <summary>
 		/// The count of descendant NODES of this node, not including this node itself.
@@ -51,34 +92,43 @@ namespace Onyx.Html.Dom
 		public bool IsConnected
 			=> Parent != null;
 		public virtual Node? LastChild => null;
-		public Node? NextSibling => Next;
-		public Node? PreviousSibling => Previous;
+		public Node? NextSibling
+			=> Parent != null && Index < Parent.Children.Count - 1 ? Parent.Children[Index + 1] : null;
+		public Node? PreviousSibling
+			=> Parent != null && Index > 0 ? Parent.Children[Index - 1] : null;
 		public abstract NodeType NodeType { get; }
 		public abstract string NodeName { get; }
-		public abstract string? Value { get; set; }
+
 		public Document? OwnerDocument => (Root ?? this) as Document;
 		public Node? ParentNode => Parent;
 		public Element? ParentElement => Parent as Element;
-		public abstract string TextContent { get; set; }
+
+		public virtual string? Value
+		{
+			get => null;
+			set { }
+		}
+
+		public virtual string TextContent
+		{
+			get => string.Empty;
+			set { }
+		}
 
 		public abstract void AppendChild(Node child);
 		public abstract Node CloneNode(bool deep = false);
 		public abstract bool HasChildNodes();
 		public abstract void InsertBefore(Node newNode, Node referenceNode);
-		public abstract void Normalize();
 		public abstract void RemoveChild(Node child);
 		public abstract void ReplaceChild(Node newNode, Node referenceNode);
 
-		public event AttachEventHandler? Attaching;
-		public event AttachEventHandler? Attached;
-		public event AttachEventHandler? Detaching;
-		public event AttachEventHandler? Detached;
+		public virtual void Normalize() { }
 
 		public Node GetRootNode() => Root ?? this;
 
 		public Node()
 		{
-			SubtreeElementCount = this is Element ? 1 : 0;
+			_uniqueId = (ushort)Interlocked.Increment(ref _uniqueIdSource);
 		}
 
 		public bool ContainsOrIs(Node other)
@@ -442,14 +492,24 @@ namespace Onyx.Html.Dom
 			return stringBuilder.ToString();
 		}
 
+		/// <summary>
+		/// This handler is triggered any time this node is attached or detached from a
+		/// parent node.
+		/// </summary>
+		protected virtual void OnAttach(AttachmentAction action, ContainerNode parent)
+		{
+		}
+
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal static void OnAttaching(ContainerNode parent, Node child)
-			=> child.Attaching?.Invoke(parent, child);
+		{
+			child.OnAttach(AttachmentAction.Attaching, parent);
+		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal static void OnAttached(ContainerNode parent, Node child)
 		{
-			child.Attached?.Invoke(parent, child);
+			child.OnAttach(AttachmentAction.Attached, parent);
 
 			if (child.Root is IElementLookupContainer fastLookupContainer
 				&& child is Element element)
@@ -463,13 +523,13 @@ namespace Onyx.Html.Dom
 				&& child is Element element)
 				fastLookupContainer.RemoveDescendant(element);
 
-			child.Detaching?.Invoke(parent, child);
+			child.OnAttach(AttachmentAction.Detaching, parent);
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal static void OnDetached(ContainerNode parent, Node child)
-			=> child.Detached?.Invoke(parent, child);
+		{
+			child.OnAttach(AttachmentAction.Detached, parent);
+		}
 	}
-
-	public delegate void AttachEventHandler(ContainerNode parent, Node child);
 }

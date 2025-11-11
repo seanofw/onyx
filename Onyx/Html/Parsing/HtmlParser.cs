@@ -1,4 +1,4 @@
-﻿using Onyx.Extensions;
+using Onyx.Extensions;
 using Onyx.Html.Dom;
 
 namespace Onyx.Html.Parsing
@@ -92,8 +92,8 @@ namespace Onyx.Html.Parsing
 		#region Public API
 
 		/// <summary>
-		/// Parse an HTML document or document fragment, and return it.  This handles bad
-		/// markup the same way that HTML5 does, by resolving per the usual quirky rules.
+		/// Parse an HTML document, and return it.  This handles bad markup the same way that
+		/// HTML5 does, by resolving per the usual quirky rules.
 		/// </summary>
 		/// <remarks>
 		/// While the intent here is generally an HTML5 standards-compliant parser, we *do*
@@ -111,9 +111,9 @@ namespace Onyx.Html.Parsing
 		/// anything that is metadata about the "document" belongs in real code.</item>
 		/// <item>If you include a {head} section, it will be parsed, but it will not be
 		/// included in the rendered content.</item>
-		/// <item>The {style} and {script} tags are ignored as well.  For compatibility, they
-		/// are treated like comments and effectively discarded from the document.  A future
-		/// parser may support {style}, but {script} is unlikely to ever be supported.</item>
+		/// <item>The {style} and {script} tags are ignored as well.  (You may, however, locate
+		/// any {style} elements in the document and then feed them into a CssParser to produce
+		/// a usable Stylesheet.)</item>
 		/// <item>CDATA sections are not supported.  If you need large chunks of data content,
 		/// put them in real XML, or JSON, or SQL, or CSV, or any of a hundred other places
 		/// you can store your data.</item>
@@ -127,6 +127,22 @@ namespace Onyx.Html.Parsing
 			HtmlLexer lexer = new HtmlLexer(text, filename, Messages);
 
 			Document fragment = new Document();
+			ParseTokens(lexer, fragment);
+
+			return fragment;
+		}
+
+		/// <summary>
+		/// Parse an HTML document fragment, and return it.  This handles bad markup the
+		/// same way that HTML5 does, by resolving per the usual quirky rules.  This is really
+		/// not fundamentally different than Parse(), but just has less overhead, since
+		/// DocumentFragment is a much less useful root than Document is.
+		/// </summary>
+		public DocumentFragment ParseDocumentFragment(string text, string filename)
+		{
+			HtmlLexer lexer = new HtmlLexer(text, filename, Messages);
+
+			DocumentFragment fragment = new DocumentFragment();
 			ParseTokens(lexer, fragment);
 
 			return fragment;
@@ -149,6 +165,14 @@ namespace Onyx.Html.Parsing
 
 			_innerHtmlParser.ParseTokens(lexer, parent);
 		}
+
+		/// <summary>
+		/// Parse HTML text for the OuterHtml property of an element.
+		/// </summary>
+		/// <param name="text">The HTML text to parse.</param>
+		/// <returns>The new DocumentFragment.</returns>
+		internal static DocumentFragment ParseOuterHtml(string text)
+			=> _innerHtmlParser.ParseDocumentFragment(text, "<outerhtml>");
 
 		#endregion
 

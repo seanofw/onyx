@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using System.Reflection;
 using Onyx.Html.Dom;
 
@@ -22,12 +22,12 @@ namespace Onyx.Css.Selectors
 		}
 
 		private static readonly FieldInfo _styleFlagsProperty =
-			typeof(Element).GetField(nameof(Element.StyleFlags), BindingFlags.Instance | BindingFlags.NonPublic)!;
+			typeof(Node).GetField(nameof(Node.StyleFlags), BindingFlags.Instance | BindingFlags.NonPublic)!;
 
 		public override Expression GetMatchExpression(ParameterExpression element)
 			=> Expression.Equal(
 				Expression.And(
-					Expression.MakeMemberAccess(element, _styleFlagsProperty),
+					Expression.MakeMemberAccess(Expression.Convert(element, typeof(Node)), _styleFlagsProperty),
 					Expression.Constant(Mask)),
 				Expression.Constant(Match));
 

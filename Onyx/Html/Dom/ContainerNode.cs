@@ -1,5 +1,6 @@
-﻿using Onyx.Css;
-using Onyx.Css.Computed;
+using System.Text;
+using Onyx.Css;
+using Onyx.Html.Parsing;
 
 namespace Onyx.Html.Dom
 {
@@ -25,28 +26,121 @@ namespace Onyx.Html.Dom
 		public IReadOnlyList<Node> Children => _children ?? (IReadOnlyList<Node>)Array.Empty<Node>();
 
 		/// <summary>
+		/// The number of immediate children of this container.
+		/// </summary>
+		public override int ChildElementCount => _childElementCount;
+		private int _childElementCount;
+
+		/// <summary>
+		/// The count of descendant NODES of this node, including this node itself.
+		/// </summary>
+		public override int SubtreeNodeCount => _subtreeNodeCount;
+		private int _subtreeNodeCount;
+
+		/// <summary>
+		/// The count of descendant ELEMENTS of this node, including this node itself.
+		/// </summary>
+		public override int SubtreeElementCount => _subtreeElementCount;
+		private int _subtreeElementCount;
+
+		/// <summary>
 		/// The actual internal storage of the children, as a list whose internal storage
 		/// shape will vary depending on how many children there are.
 		/// </summary>
 		private NodeList<Node>? _children;
 
 		/// <summary>
-		/// The first child of this container, as a direct reference.
+		/// The first child of this container.
 		/// </summary>
-		public override Node? FirstChild => _firstChild;
-		private Node? _firstChild;
+		public override Node? FirstChild => _children != null ? _children[0] : null;
 
 		/// <summary>
-		/// The last child of this container, as a direct reference.
+		/// The last child of this container.
 		/// </summary>
-		public override Node? LastChild => _lastChild;
-		private Node? _lastChild;
+		public override Node? LastChild => _children != null ? _children[_children.Count - 1] : null;
 
 		/// <summary>
 		/// The number of child nodes contained by this container.  (This is children,
 		/// not descendants.)
 		/// </summary>
 		public int Count => _children?.Count ?? 0;
+
+		#endregion
+
+		#region Construction
+
+		/// <summary>
+		/// Construct a new container.
+		/// </summary>
+		protected ContainerNode()
+		{
+			_subtreeNodeCount = 1;
+			_subtreeElementCount = this is Element ? 1 : 0;
+		}
+
+		#endregion
+
+		#region Overrides
+
+		/// <summary>
+		/// Reading the TextContent will provide the combined text of all child nodes.
+		/// Writing the TextContent will replace all child nodes with the provided string.
+		/// </summary>
+		public override string TextContent
+		{
+			get => string.Join("", Children.Select(c => c.TextContent));
+
+			set
+			{
+				Clear();
+				AppendChild(new TextNode(value));
+			}
+		}
+
+		/// <summary>
+		/// Reading the InnerHtml property will produce equivalent HTML to that which was used
+		/// to create all descendant nodes.  Writing the InnerHtml property will parse the given HTML
+		/// text and then replace all descendant nodes of this container with the parsed nodes.
+		/// </summary>
+		public string InnerHtml
+		{
+			get
+			{
+				StringBuilder stringBuilder = new StringBuilder();
+				foreach (Node child in Children)
+				{
+					child.ToString(stringBuilder);
+				}
+				return stringBuilder.ToString();
+			}
+
+			set
+			{
+				HtmlParser.ParseInnerHtml(value, this);
+			}
+		}
+
+		/// <summary>
+		/// Reading the OuterHtml property will produce equivalent HTML to that which was used
+		/// to create this node and all of its descendants.  Writing the OuterHtml property will
+		/// parse the given HTML text, and will then replace *this* node itself with the resulting
+		/// node(s), if and only if the immediate parent of this node is a ContainerNode.
+		/// </summary>
+		public string OuterHtml
+		{
+			get => ToString();
+
+			set
+			{
+				if (Parent is not ContainerNode containerNode)
+					throw new InvalidOperationException("OuterHtml cannot be assigned on a node whose parent is not a modifiable ContainerNode.");
+
+				DocumentFragment fragment = HtmlParser.ParseOuterHtml(value);
+
+				while (fragment.FirstChild != null)
+					containerNode.InsertBefore(fragment.FirstChild, this);
+			}
+		}
 
 		#endregion
 
@@ -118,11 +212,11 @@ namespace Onyx.Html.Dom
 			_children ??= new NodeList<Node>();
 			_children.Add(child);
 
-			AttachAtEnd(child);
+			child.Parent = this;
 			SetRoot(child, Root);
 			child.Index = _children.Count - 1;
 
-			ChildElementCount += (child is Element ? +1 : 0);
+			_childElementCount += (child is Element ? +1 : 0);
 			UpdateSubtreeCount(child.SubtreeNodeCount, child.SubtreeElementCount);
 
 			Node.OnAttached(this, child);
@@ -238,9 +332,9 @@ namespace Onyx.Html.Dom
 			_children ??= new NodeList<Node>();
 			_children!.Insert(referenceIndex, newNode);
 
-			AttachBefore(newNode, referenceNode);
+			newNode.Parent = this;
 			SetRoot(newNode, Root);
-			ChildElementCount += (newNode is Element ? +1 : 0);
+			_childElementCount += (newNode is Element ? +1 : 0);
 			UpdateSubtreeCount(newNode.SubtreeNodeCount, newNode.SubtreeElementCount);
 			UpdateIndexesOnAndAfter(referenceIndex);
 
@@ -286,10 +380,10 @@ namespace Onyx.Html.Dom
 					_children = null;
 			}
 
-			Detach(child);
+			child.Parent = null;
 			SetRoot(child, null);
 			UpdateIndexesOnAndAfter(child.Index);
-			ChildElementCount += (child is Element ? -1 : 0);
+			_childElementCount += (child is Element ? -1 : 0);
 			UpdateSubtreeCount(-child.SubtreeNodeCount, -child.SubtreeElementCount);
 			child.Index = -1;
 
@@ -320,7 +414,7 @@ namespace Onyx.Html.Dom
 				_children = null;
 
 			UpdateIndexesOnAndAfter(index);
-			ChildElementCount += (child is Element ? -1 : 0);
+			_childElementCount += (child is Element ? -1 : 0);
 			UpdateSubtreeCount(child.SubtreeNodeCount, child.SubtreeElementCount);
 			child.Index = -1;
 
@@ -427,12 +521,12 @@ namespace Onyx.Html.Dom
 			Node.OnAttaching(this, newNode);
 
 			_children![referenceNode.Index] = newNode;
-			AttachBefore(newNode, referenceNode);
-			Detach(referenceNode);
+			newNode.Parent = this;
+			referenceNode.Parent = null;
 			SetRoot(newNode, Root);
 			newNode.Index = referenceNode.Index;
 			SetRoot(referenceNode, null);
-			ChildElementCount += (referenceNode is Element ? -1 : 0) + (newNode is Element ? +1 : 0);
+			_childElementCount += (referenceNode is Element ? -1 : 0) + (newNode is Element ? +1 : 0);
 			UpdateSubtreeCount(newNode.SubtreeNodeCount - referenceNode.SubtreeNodeCount,
 				newNode.SubtreeElementCount - referenceNode.SubtreeElementCount);
 			referenceNode.Index = -1;
@@ -462,7 +556,7 @@ namespace Onyx.Html.Dom
 				{
 					if (string.IsNullOrEmpty(child.Value))
 					{
-						Detach(child);
+						child.Parent = null;
 						SetRoot(child, null);
 						child.Index = -1;
 						src++;
@@ -470,7 +564,7 @@ namespace Onyx.Html.Dom
 					else if (src + 1 < _children.Count && (next = _children[src + 1]).NodeType == NodeType.Text)
 					{
 						child.Value += next.Value;
-						Detach(next);
+						next.Parent = null;
 						SetRoot(next, null);
 						child.Index = -1;
 					}
@@ -503,12 +597,12 @@ namespace Onyx.Html.Dom
 
 			for (int i = _children.Count - 1; i >= 0; i--)
 			{
-				Detach(_children[i]);
+				_children[i].Parent = null;
 				SetRoot(_children[i], null);
 				_children[i].Index = -1;
 			}
 
-			ChildElementCount = 0;
+			_childElementCount = 0;
 			UpdateSubtreeCount(-(SubtreeNodeCount - 1),
 				this is Element ? -(SubtreeElementCount - 1) : -SubtreeElementCount);
 
@@ -578,79 +672,32 @@ namespace Onyx.Html.Dom
 		/// <param name="elementDelta">The amount to add/subtract to each subtree ELEMENT count.</param>
 		private void UpdateSubtreeCount(int nodeDelta, int elementDelta)
 		{
-			for (Node? node = this; node != null; node = node.Parent)
+			for (ContainerNode? node = this; node != null; node = node.Parent as ContainerNode)
 			{
-				node.SubtreeElementCount += elementDelta;
-				node.SubtreeNodeCount += nodeDelta;
+				node._subtreeElementCount += elementDelta;
+				node._subtreeNodeCount += nodeDelta;
 			}
 		}
 
 		/// <summary>
-		/// Attach the given child at the end of the container.  This *only* updates
-		/// the relative pointers, and does *not* update the _children list.  This does
-		/// not perform any safety or correctness checks, and runs in O(1) time.
+		/// Recursively copy all descendants of this node to the given parent, which must
+		/// be an empty container.
 		/// </summary>
-		/// <param name="child">The child to append, which must not be null.</param>
-		private void AttachAtEnd(Node child)
+		/// <param name="parent">The parent to copy all of the descendants to.</param>
+		protected void CloneDescendantsTo(ContainerNode parent)
 		{
-			child.Parent = this;
+			if (parent.Count != 0)
+				throw new InvalidOperationException("Cannot clone to a parent with contents.");
 
-			if ((child.Previous = _lastChild) != null)
-				child.Previous.Next = child;
-			else
-				_firstChild = child;
+			foreach (Node node in ChildNodes)
+			{
+				Node clone = node.CloneNode(true);
+				parent.AppendChildFastAndUnsafe(clone);
+			}
 
-			_lastChild = child;
-
-			child.Next = null;
-		}
-
-		/// <summary>
-		/// Attach the given child before the given existing child of the container.  This
-		/// *only* updates the relative pointers, and does *not* update the _children list.
-		/// This does not perform any safety or correctness checks, and runs in O(1) time.
-		/// </summary>
-		/// <param name="newChild">The child to append, which must not be null.</param>
-		/// <param name="existingChild">The existing child to insert the new child before,
-		/// which must not be null.</param>
-		private void AttachBefore(Node newChild, Node existingChild)
-		{
-			newChild.Parent = this;
-
-			newChild.Next = existingChild;
-			if (newChild.Next != null)
-				newChild.Next.Previous = newChild;
-			else
-				_lastChild = newChild;
-
-			newChild.Previous = existingChild.Previous;
-			if (newChild.Previous != null)
-				newChild.Previous.Next = newChild;
-			else
-				_firstChild = newChild;
-		}
-
-		/// <summary>
-		/// Detach the given child from the container.  This *only* updates the relative
-		/// pointers, and does *not* update the _children list.  This does not perform any
-		/// safety or correctness checks, and runs in O(1) time.
-		/// </summary>
-		/// <param name="child">The child to detach.  This must not be null.</param>
-		private void Detach(Node child)
-		{
-			if (child.Next != null)
-				child.Next.Previous = child.Previous;
-			else
-				_lastChild = child.Previous;
-
-			if (child.Previous != null)
-				child.Previous.Next = child.Next;
-			else
-				_firstChild = child.Next;
-
-			child.Parent = null;
-			child.Next = null;
-			child.Previous = null;
+#if DEBUG
+			VerifyTree(parent);
+#endif
 		}
 
 #if DEBUG
@@ -681,9 +728,9 @@ namespace Onyx.Html.Dom
 						throw new InvalidOperationException("Parent pointer set incorrectly.");
 					if (child.Index != i)
 						throw new InvalidOperationException("Child index set incorrectly.");
-					if (child.Previous != prev)
+					if (child.PreviousSibling != prev)
 						throw new InvalidOperationException("Previous pointer set incorrectly.");
-					if (prev != null && prev.Next != child)
+					if (prev != null && prev.NextSibling != child)
 						throw new InvalidOperationException("Next pointer set incorrectly.");
 					prev = child;
 
@@ -698,7 +745,7 @@ namespace Onyx.Html.Dom
 					throw new InvalidOperationException("Last child set incorrectly.");
 				if (containerNode.Count != count)
 					throw new InvalidOperationException("Count set incorrectly.");
-				if (containerNode.ChildElementCount != childElementCount)
+				if (containerNode._childElementCount != childElementCount)
 					throw new InvalidOperationException("Child element count set incorrectly.");
 			}
 

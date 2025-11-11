@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using Onyx.Extensions;
 
@@ -22,6 +22,8 @@ namespace Onyx.Html.Dom
 				: throw new KeyNotFoundException($"Attribute '{key}' not found.");
 			set
 			{
+				if (value.Element != _owner)
+					throw new ArgumentException("Cannot attach an Attribute owned by another Element to this Element.");
 				EnsureDict();
 				key = key.FastLowercase();
 				if (!_attributes!.TryGetValue(key, out Attribute? oldValue)
@@ -49,6 +51,8 @@ namespace Onyx.Html.Dom
 
 		public void Add(string key, Attribute value)
 		{
+			if (value.Element != _owner)
+				throw new ArgumentException("Cannot attach an Attribute owned by another Element to this Element.");
 			EnsureDict();
 			key = key.FastLowercase();
 			_attributes!.Add(key, value);

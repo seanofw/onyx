@@ -1,14 +1,10 @@
-﻿using System.Data;
+using System.Data;
 using System.Diagnostics;
-using System.Formats.Asn1;
 using System.Text;
-using System.Xml.Linq;
 using Onyx.Css;
 using Onyx.Css.Computed;
 using Onyx.Css.Parsing;
 using Onyx.Css.Properties;
-using Onyx.Css.Selectors;
-using Onyx.Html.Parsing;
 
 namespace Onyx.Html.Dom
 {
@@ -18,9 +14,6 @@ namespace Onyx.Html.Dom
 
 		private NamedNodeMap? _attributes;
 		internal Dictionary<string, Attribute>? AttributesDict;
-
-		internal RenderFlags RenderFlags;
-		internal StyleFlags StyleFlags;
 
 		public string Id
 		{
@@ -93,12 +86,6 @@ namespace Onyx.Html.Dom
 		}
 
 		public override string NodeName { get; }
-
-		public override string? Value
-		{
-			get => null;
-			set => throw new NotSupportedException();
-		}
 
 		public override string TextContent
 		{
@@ -173,7 +160,22 @@ namespace Onyx.Html.Dom
 
 		public override Node CloneNode(bool deep = false)
 		{
-			throw new NotImplementedException();
+			Element clone = new Element(NodeName);
+			clone.SourceLocation = SourceLocation;
+
+			if (_attributes != null)
+			{
+				NamedNodeMap cloneAttributes = clone.Attributes;
+				foreach (KeyValuePair<string, Attribute> pair in _attributes)
+				{
+					Attribute cloneAttribute = new Attribute(clone, pair.Key, pair.Value.Value);
+					cloneAttributes.Add(new KeyValuePair<string, Attribute>(pair.Key, cloneAttribute));
+				}
+			}
+
+			if (deep)
+				CloneDescendantsTo(clone);
+			return clone;
 		}
 
 		internal virtual void OnAttrChange(string? name, Attribute? attr, string? oldValue)
@@ -279,30 +281,6 @@ namespace Onyx.Html.Dom
 
 			if (!AutoClosingTags.Contains(NodeName))
 				stringBuilder.Append($"</{NodeName}>");
-		}
-
-		public string InnerHtml
-		{
-			get
-			{
-				StringBuilder stringBuilder = new StringBuilder();
-				foreach (Node child in Children)
-				{
-					child.ToString(stringBuilder);
-				}
-				return stringBuilder.ToString();
-			}
-
-			set
-			{
-				HtmlParser.ParseInnerHtml(value, this);
-			}
-		}
-
-		public string OuterHtml
-		{
-			get => ToString();
-			set => throw new NotSupportedException();
 		}
 
 		public virtual bool HasPseudoClass(string name, string? value)
