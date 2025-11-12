@@ -8,12 +8,17 @@ using Onyx.Css.Properties;
 
 namespace Onyx.Html.Dom
 {
+	/// <summary>
+	/// A single element on a page.
+	/// </summary>
 	public class Element : ContainerNode, IAttributeNode
 	{
+		/// <summary>
+		/// Elements are of type "Element."
+		/// </summary>
 		public override NodeType NodeType => NodeType.Element;
 
-		private NamedNodeMap? _attributes;
-		internal Dictionary<string, Attribute>? AttributesDict;
+		internal Dictionary<string, string>? AttributesDict;
 
 		public string Id
 		{
@@ -23,7 +28,7 @@ namespace Onyx.Html.Dom
 				if (_id != value)
 				{
 					NamedNodeMap attributes = Attributes;
-					attributes["id"] = new Attribute(this, "id", value);
+					attributes["id"] = value;
 				}
 			}
 		}
@@ -37,7 +42,7 @@ namespace Onyx.Html.Dom
 				if (_className != value)
 				{
 					NamedNodeMap attributes = Attributes;
-					attributes["class"] = new Attribute(this, "class", value);
+					attributes["class"] = value;
 				}
 			}
 		}
@@ -82,7 +87,7 @@ namespace Onyx.Html.Dom
 			string className = string.Join(" ", ClassNames.OrderBy(c => c.ToLowerInvariant()));
 
 			NamedNodeMap attributes = Attributes;
-			attributes["class"] = new Attribute(this, "class", className);
+			attributes["class"] = className;
 		}
 
 		public override string NodeName { get; }
@@ -98,7 +103,7 @@ namespace Onyx.Html.Dom
 			}
 		}
 
-		public NamedNodeMap Attributes => _attributes ??= new NamedNodeMap(this);
+		public NamedNodeMap Attributes => new NamedNodeMap(this);
 
 		public string StartTag
 		{
@@ -116,12 +121,12 @@ namespace Onyx.Html.Dom
 
 			stringBuilder.Append(NodeName);
 
-			if (_attributes != null)
+			if (AttributesDict != null)
 			{
-				foreach (KeyValuePair<string, Attribute> pair in _attributes)
+				foreach (KeyValuePair<string, string> pair in AttributesDict)
 				{
 					stringBuilder.Append(' ');
-					pair.Value.ToString(stringBuilder);
+					stringBuilder.Append(pair.Value);
 				}
 			}
 
@@ -163,14 +168,11 @@ namespace Onyx.Html.Dom
 			Element clone = new Element(NodeName);
 			clone.SourceLocation = SourceLocation;
 
-			if (_attributes != null)
+			if (AttributesDict != null)
 			{
 				NamedNodeMap cloneAttributes = clone.Attributes;
-				foreach (KeyValuePair<string, Attribute> pair in _attributes)
-				{
-					Attribute cloneAttribute = new Attribute(clone, pair.Key, pair.Value.Value);
-					cloneAttributes.Add(new KeyValuePair<string, Attribute>(pair.Key, cloneAttribute));
-				}
+				foreach (KeyValuePair<string, string> pair in AttributesDict)
+					cloneAttributes.Add(pair.Key, pair.Value);
 			}
 
 			if (deep)
@@ -178,19 +180,19 @@ namespace Onyx.Html.Dom
 			return clone;
 		}
 
-		internal virtual void OnAttrChange(string? name, Attribute? attr, string? oldValue)
+		protected internal virtual void OnAttrChange(string? name, string? newValue, string? oldValue)
 		{
 			if (name == "id")
 			{
 #if DEBUG
-				if (attr != null && !string.IsNullOrEmpty(attr.Value) && !char.IsLetterOrDigit(attr.Value[0]) && attr.Value[0] != '_')
-					Debug.WriteLine($"Note: ID '{attr.Value}' starts with punctuation, which is often a mistake. This may be a bug in your code.");
+				if (!string.IsNullOrEmpty(newValue) && !char.IsLetterOrDigit(newValue[0]) && newValue[0] != '_')
+					Debug.WriteLine($"Note: ID '{newValue}' starts with punctuation, which is often a mistake. This may be a bug in your code.");
 #endif
 
 				IElementLookupContainer? fastLookupContainer = Root as IElementLookupContainer;
 
 				fastLookupContainer?.RemoveDescendant(this);
-				_id = attr?.Value ?? string.Empty;
+				_id = newValue ?? string.Empty;
 				fastLookupContainer?.AddDescendant(this);
 
 				InvalidateComputedStyle();
@@ -198,15 +200,15 @@ namespace Onyx.Html.Dom
 			else if (name == "class")
 			{
 #if DEBUG
-				if (attr != null && !string.IsNullOrEmpty(attr.Value) && !char.IsLetterOrDigit(attr.Value[0]) && attr.Value[0] != '_')
-					Debug.WriteLine($"Note: Classname '{attr.Value}' starts with punctuation, which is often a mistake. This may be a bug in your code.");
+				if (!string.IsNullOrEmpty(newValue) && !char.IsLetterOrDigit(newValue[0]) && newValue[0] != '_')
+					Debug.WriteLine($"Note: Classname '{newValue}' starts with punctuation, which is often a mistake. This may be a bug in your code.");
 #endif
 
 				IElementLookupContainer? fastLookupContainer = Root as IElementLookupContainer;
 
 				fastLookupContainer?.RemoveDescendant(this);
 
-				_className = attr?.Value ?? string.Empty;
+				_className = newValue ?? string.Empty;
 				_classNames = _className
 					.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
 					.ToHashSet();
@@ -253,7 +255,7 @@ namespace Onyx.Html.Dom
 		{
 			_inlineStyleParser.Messages.Clear();
 
-			string? inlineStyle = AttributesDict?.GetValueOrDefault("style")?.Value;
+			string inlineStyle = Attributes["style"];
 			if (string.IsNullOrEmpty(inlineStyle))
 				return StylePropertySet.Empty;
 

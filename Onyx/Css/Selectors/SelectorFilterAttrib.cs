@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using Onyx.Extensions;
@@ -24,8 +24,6 @@ namespace Onyx.Css.Selectors
 			typeof(Element).GetProperty(nameof(Element.Attributes), BindingFlags.Instance | BindingFlags.Public)!;
 		private static readonly MethodInfo _tryGetValueMethod =
 			typeof(NamedNodeMap).GetMethod(nameof(NamedNodeMap.TryGetValue), BindingFlags.Instance | BindingFlags.Public)!;
-		private static readonly PropertyInfo _safeValueProperty =
-			typeof(Html.Dom.Attribute).GetProperty(nameof(Html.Dom.Attribute.SafeValue), BindingFlags.Instance | BindingFlags.NonPublic)!;
 
 		private static readonly MethodInfo _equalsMethod =
 			typeof(string).GetMethod(nameof(string.Equals),
@@ -50,7 +48,6 @@ namespace Onyx.Css.Selectors
 
 		public override Expression GetMatchExpression(ParameterExpression element)
 		{
-			ParameterExpression attrVariable = Expression.Parameter(typeof(Html.Dom.Attribute), "attr");
 			ParameterExpression valueVariable = Expression.Parameter(typeof(string), "value");
 
 			Expression equalExpression = Kind switch
@@ -128,7 +125,7 @@ namespace Onyx.Css.Selectors
 			};
 
 			return Expression.Block(typeof(bool),
-				[attrVariable, valueVariable],
+				[valueVariable],
 				[
 					Expression.Condition(						// if
 						Expression.Not(							//    (!
@@ -138,16 +135,12 @@ namespace Onyx.Css.Selectors
 									_attributesProperty),
 								_tryGetValueMethod,				//                        .TryGetValue(
 								Expression.Constant(Name),		//                                     Name,
-								attrVariable)),					//                                           out attr))
+								valueVariable)),				//                                           out value))
 						Expression.Constant(false),				//     => false;
 
-						Expression.Block(typeof(bool),			// else {
-							Expression.Assign(
-								valueVariable,					//     string value = attr.SafeValue;
-								Expression.MakeMemberAccess(attrVariable, _safeValueProperty)),
-
+						Expression.Block(typeof(bool),			// else
 							equalExpression						//     => expression;
-						)										// }
+						)
 					),
 				]
 			);
@@ -155,10 +148,10 @@ namespace Onyx.Css.Selectors
 
 		public override bool IsMatch(Element element)
 		{
-			if (!element.Attributes.TryGetValue(Name, out Html.Dom.Attribute? attr))
+			if (!element.Attributes.TryGetValue(Name, out string? value))
 				return false;
 
-			string value = attr.SafeValue;
+			value ??= string.Empty;
 
 			return Kind switch
 			{

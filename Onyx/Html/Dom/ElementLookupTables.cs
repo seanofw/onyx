@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using Onyx.Css.Selectors;
 
 namespace Onyx.Html.Dom
@@ -30,13 +30,13 @@ namespace Onyx.Html.Dom
 				if (!string.IsNullOrEmpty(attributeNode.Id))
 					AddToSet(element, attributeNode.Id, _elementsById);
 
-				if (attributeNode.Attributes.TryGetValue("name", out Attribute? attr)
-					&& !string.IsNullOrEmpty(attr.Value))
-					AddToSet(element, attr.Value, _elementsByName);
+				if (attributeNode.Attributes.TryGetValue("name", out string? value)
+					&& !string.IsNullOrEmpty(value))
+					AddToSet(element, value, _elementsByName);
 
-				if (attributeNode.Attributes.TryGetValue("type", out attr)
-					&& !string.IsNullOrEmpty(attr.Value))
-					AddToSet(element, attr.Value, _elementsByTypeAttribute);
+				if (attributeNode.Attributes.TryGetValue("type", out value)
+					&& !string.IsNullOrEmpty(value))
+					AddToSet(element, value, _elementsByTypeAttribute);
 
 				foreach (string className in attributeNode.ClassNames)
 					AddToSet(element, className, _elementsByClassName);
@@ -66,13 +66,13 @@ namespace Onyx.Html.Dom
 				if (!string.IsNullOrEmpty(attributeNode.Id))
 					RemoveFromSet(element, attributeNode.Id, _elementsById);
 
-				if (attributeNode.Attributes.TryGetValue("name", out Attribute? attr)
-					&& !string.IsNullOrEmpty(attr.Value))
-					RemoveFromSet(element, attr.Value, _elementsByName);
+				if (attributeNode.Attributes.TryGetValue("name", out string? value)
+					&& !string.IsNullOrEmpty(value))
+					RemoveFromSet(element, value, _elementsByName);
 
-				if (attributeNode.Attributes.TryGetValue("type", out attr)
-					&& !string.IsNullOrEmpty(attr.Value))
-					RemoveFromSet(element, attr.Value, _elementsByTypeAttribute);
+				if (attributeNode.Attributes.TryGetValue("type", out value)
+					&& !string.IsNullOrEmpty(value))
+					RemoveFromSet(element, value, _elementsByTypeAttribute);
 
 				foreach (string className in attributeNode.ClassNames)
 					RemoveFromSet(element, className, _elementsByClassName);

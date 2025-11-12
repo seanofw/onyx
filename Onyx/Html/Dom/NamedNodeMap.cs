@@ -4,33 +4,31 @@ using Onyx.Extensions;
 
 namespace Onyx.Html.Dom
 {
-	public struct NamedNodeMap : IDictionary<string, Attribute>
+	public struct NamedNodeMap : IDictionary<string, string>
 	{
 		private readonly Element _owner;
 
-		private readonly Dictionary<string, Attribute>? _attributes => _owner.AttributesDict;
+		private readonly Dictionary<string, string>? _attributes => _owner.AttributesDict;
 
 		public NamedNodeMap(Element owner)
 		{
 			_owner = owner;
 		}
 
-		public Attribute this[string key]
+		public string this[string key]
 		{
 			get => _attributes != null
 				? _attributes[key.FastLowercase()]
 				: throw new KeyNotFoundException($"Attribute '{key}' not found.");
 			set
 			{
-				if (value.Element != _owner)
-					throw new ArgumentException("Cannot attach an Attribute owned by another Element to this Element.");
 				EnsureDict();
 				key = key.FastLowercase();
-				if (!_attributes!.TryGetValue(key, out Attribute? oldValue)
+				if (!_attributes!.TryGetValue(key, out string? oldValue)
 					|| !ReferenceEquals(value, oldValue))
 				{
 					_attributes[key] = value;
-					_owner.OnAttrChange(key, value, oldValue?.Value);
+					_owner.OnAttrChange(key, value, oldValue);
 				}
 			}
 		}
@@ -39,27 +37,25 @@ namespace Onyx.Html.Dom
 			=> throw new NotSupportedException();
 
 		private void EnsureDict()
-			=> _owner.AttributesDict ??= new Dictionary<string, Attribute>();
+			=> _owner.AttributesDict ??= new Dictionary<string, string>();
 
 		public ICollection<string> Keys => throw new NotSupportedException();
 
-		public ICollection<Attribute> Values => throw new NotSupportedException();
+		public ICollection<string> Values => throw new NotSupportedException();
 
 		public readonly int Count => _attributes?.Count ?? 0;
 
 		public readonly bool IsReadOnly => false;
 
-		public void Add(string key, Attribute value)
+		public void Add(string key, string value)
 		{
-			if (value.Element != _owner)
-				throw new ArgumentException("Cannot attach an Attribute owned by another Element to this Element.");
 			EnsureDict();
 			key = key.FastLowercase();
 			_attributes!.Add(key, value);
 			_owner.OnAttrChange(key, value, null);
 		}
 
-		public void Add(KeyValuePair<string, Attribute> item)
+		public void Add(KeyValuePair<string, string> item)
 			=> Add(item.Key.FastLowercase(), item.Value);
 
 		public void Clear()
@@ -68,21 +64,21 @@ namespace Onyx.Html.Dom
 			_owner.OnAttrChange(null, null, null);
 		}
 
-		public readonly bool Contains(KeyValuePair<string, Attribute> item)
+		public readonly bool Contains(KeyValuePair<string, string> item)
 			=> _attributes?.Contains(item) ?? false;
 
 		public readonly bool ContainsKey(string key)
 			=> _attributes?.ContainsKey(key.FastLowercase()) ?? false;
 
-		public readonly void CopyTo(KeyValuePair<string, Attribute>[] array, int arrayIndex)
+		public readonly void CopyTo(KeyValuePair<string, string>[] array, int arrayIndex)
 		{
 			if (_attributes != null)
-				((ICollection<KeyValuePair<string, Attribute>>)_attributes).CopyTo(array, arrayIndex);
+				((ICollection<KeyValuePair<string, string>>)_attributes).CopyTo(array, arrayIndex);
 		}
 
-		public readonly IEnumerator<KeyValuePair<string, Attribute>> GetEnumerator()
+		public readonly IEnumerator<KeyValuePair<string, string>> GetEnumerator()
 			=> _attributes?.OrderBy(a => a.Key).GetEnumerator()
-				?? Enumerable.Empty<KeyValuePair<string, Attribute>>().GetEnumerator();
+				?? Enumerable.Empty<KeyValuePair<string, string>>().GetEnumerator();
 
 		public bool Remove(string key)
 		{
@@ -95,15 +91,15 @@ namespace Onyx.Html.Dom
 			return false;
 		}
 
-		public bool Remove(KeyValuePair<string, Attribute> item)
+		public bool Remove(KeyValuePair<string, string> item)
 		{
-			if (!TryGetValue(item.Key.FastLowercase(), out Attribute? attr)
-				|| !ReferenceEquals(attr, item.Value))
+			if (!TryGetValue(item.Key.FastLowercase(), out string? value)
+				|| !ReferenceEquals(value, item.Value))
 				return false;
 			return Remove(item.Key);
 		}
 
-		public readonly bool TryGetValue(string key, [MaybeNullWhen(false)] out Attribute value)
+		public readonly bool TryGetValue(string key, [MaybeNullWhen(false)] out string value)
 		{
 			if (_attributes == null)
 			{
@@ -116,22 +112,5 @@ namespace Onyx.Html.Dom
 
 		readonly IEnumerator IEnumerable.GetEnumerator()
 			=> GetEnumerator();
-
-		public readonly Attribute? GetNamedItem(string name)
-			=> TryGetValue(name.FastLowercase(), out Attribute? attr) ? attr : null;
-
-		public Attribute? SetNamedItem(Attribute attr)
-		{
-			Attribute? oldValue = GetNamedItem(attr.Name);
-			this[attr.Name] = attr;
-			return oldValue;
-		}
-
-		public Attribute? RemoveNamedItem(string name)
-		{
-			Attribute? oldValue = GetNamedItem(name);
-			Remove(name);
-			return oldValue;
-		}
 	}
 }
