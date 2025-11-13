@@ -1,5 +1,6 @@
 using System.Data;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Onyx.Css;
 using Onyx.Css.Computed;
@@ -13,98 +14,84 @@ namespace Onyx.Html.Dom
 	/// </summary>
 	public class Element : ContainerNode, IAttributeNode
 	{
+		#region Properties and fields
+
 		/// <summary>
-		/// Elements are of type "Element."
+		/// JS DOM: Elements are of type "Element."
 		/// </summary>
 		public override NodeType NodeType => NodeType.Element;
 
-		internal Dictionary<string, string>? AttributesDict;
+		/// <summary>
+		/// The attributes of this element.  This is a dictionary-like construct that may
+		/// be modified live to affect the element.
+		/// </summary>
+		public AttributeDictionary Attributes => _attributes ??= new AttributeDictionary(this);
+		private AttributeDictionary? _attributes;
 
+		/// <summary>
+		/// JS DOM: The "id" of this element, if an "id" attribute has been assigned.  May be the
+		/// empty string.  We hold the ID in a local field to avoid the dictionary lookup, which
+		/// costs memory, but which allows retrieving this to run in true constant time (only
+		/// a few clock cycles), which is important for selector performance, as IDs are very
+		/// commonly queried in selectors.
+		/// </summary>
 		public string Id
 		{
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
 			get => _id;
-			set
-			{
-				if (_id != value)
-				{
-					NamedNodeMap attributes = Attributes;
-					attributes["id"] = value;
-				}
-			}
+
+			set => Attributes["id"] = value;
 		}
 		private string _id = string.Empty;
 
+		/// <summary>
+		/// The "class" of this element, if a "class" attribute has been assigned.  May be
+		/// the empty string.  This is the class as a simple whitespace-delimited string;
+		/// but it's also available as a `HashSet{string}` in the `ClassNames` property for
+		/// more efficient lookups.
+		/// </summary>
 		public string ClassName
 		{
-			get => _className;
-			set
-			{
-				if (_className != value)
-				{
-					NamedNodeMap attributes = Attributes;
-					attributes["class"] = value;
-				}
-			}
+			get => Attributes.TryGetValue("class", out string? value) ? value : string.Empty;
+			set => Attributes["class"] = value;
 		}
-		private string _className = string.Empty;
 
-		public IReadOnlySet<string> ClassNames => _classNames ??= _className
-			.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-			.ToHashSet();
-		private HashSet<string>? _classNames;
+		/// <summary>
+		/// The ClassNames of this element.  This set may be empty but will never be null.
+		/// Use either the Attributes dictionary or AddClass/RemoveClass to modify this.  We
+		/// hold the classnames set in a local field, which costs memory, but which allows
+		/// retrieving this set to run in true constant time (only a few clock cycles), which
+		/// is important for selector performance, as classnames are very commonly queried
+		/// in selectors.
+		/// </summary>
+		public IReadOnlySet<string> ClassNames => _classNames;
+		private HashSet<string> _classNames;
 
+		/// <summary>
+		/// An empty collection of classnames, to avoid constructing classname sets on
+		/// elements that have no classnames.
+		/// </summary>
+		private static readonly HashSet<string> _emptyClassNames = new HashSet<string>();
+
+		/// <summary>
+		/// The collection of parsed inline styles, if the "style" attribute has been assigned.
+		/// </summary>
 		public StylePropertySet InlineStyles => _inlineStyles ??= ParseInlineStyle();
 		private StylePropertySet? _inlineStyles;
 
-		public void AddClass(string className)
-		{
-			IReadOnlySet<string> _ = ClassNames;    // Force the classnames to be expanded.
+		/// <summary>
+		/// A CSS parser used for parsing the style attribute, if this has a style attribute.
+		/// </summary>
+		private static readonly CssParser _inlineStyleParser = new CssParser();
 
-			if (_classNames!.Add(className))
-				UpdateClassnameFromSet();
-		}
-
-		public void RemoveClass(string className)
-		{
-			IReadOnlySet<string> _ = ClassNames;    // Force the classnames to be expanded.
-
-			if (_classNames!.Remove(className))
-				UpdateClassnameFromSet();
-		}
-
-		public void ToggleClass(string className)
-		{
-			IReadOnlySet<string> _ = ClassNames;    // Force the classnames to be expanded.
-
-			if (!_classNames!.Add(className))
-				_classNames!.Remove(className);
-
-			UpdateClassnameFromSet();
-		}
-
-		private void UpdateClassnameFromSet()
-		{
-			string className = string.Join(" ", ClassNames.OrderBy(c => c.ToLowerInvariant()));
-
-			NamedNodeMap attributes = Attributes;
-			attributes["class"] = className;
-		}
-
+		/// <summary>
+		/// JS DOM: The name of this element.  Also called the "tag name."
+		/// </summary>
 		public override string NodeName { get; }
 
-		public override string TextContent
-		{
-			get => string.Join("", ChildNodes.Select(c => c.TextContent));
-
-			set
-			{
-				Clear();
-				AppendChild(new TextNode(value));
-			}
-		}
-
-		public NamedNodeMap Attributes => new NamedNodeMap(this);
-
+		/// <summary>
+		/// A string that represents this element's name and attributes as an HTML "start tag."
+		/// </summary>
 		public string StartTag
 		{
 			get
@@ -115,63 +102,180 @@ namespace Onyx.Html.Dom
 			}
 		}
 
-		private void AppendStartTag(StringBuilder stringBuilder)
-		{
-			stringBuilder.Append('<');
-
-			stringBuilder.Append(NodeName);
-
-			if (AttributesDict != null)
-			{
-				foreach (KeyValuePair<string, string> pair in AttributesDict)
-				{
-					stringBuilder.Append(' ');
-					stringBuilder.Append(pair.Value);
-				}
-			}
-
-			if (AutoClosingTags.Contains(NodeName))
-				stringBuilder.Append(" /");
-
-			stringBuilder.Append('>');
-		}
-
+		/// <summary>
+		/// A string that represents this element's name as an "end tag," if this element
+		/// type has an end tag.  If it is a self-closing tag, this will be the empty string.
+		/// </summary>
 		public string EndTag
 			=> AutoClosingTags.Contains(NodeName) ? string.Empty : $"</{NodeName}>";
 
+		#endregion
+
+		#region Static data tables
+
+		/// <summary>
+		/// The standard six HTML auto-closing tags, as a set.
+		/// </summary>
 		internal static IReadOnlySet<string> AutoClosingTags { get; } = new HashSet<string>
 		{
 			"meta", "link", "img", "input", "br", "hr",
 		};
 
+		/// <summary>
+		/// The standard four HTML tags that contain "raw content" (i.e., not HTML inside), as a set.
+		/// </summary>
 		internal static IReadOnlySet<string> RawContentTags { get; } = new HashSet<string>
 		{
 			"script", "style", "xmp", "plaintext",
 		};
 
+		/// <summary>
+		/// The set of HTML block-level elements, for parsing purposes.
+		/// </summary>
 		internal static IReadOnlySet<string> BlockLevelElements { get; } = new HashSet<string>
 		{
 			"address", "article", "aside", "blockquote", "details",
 			"dialog", "div", "dl", "fieldset", "figcaption", "figure",
 			"footer", "form", "h1", "h2", "h3", "h4", "h5", "h6",
 			"header", "hgroup", "hr", "main", "nav", "ol", "p",
-			"pre", "section", "table", "ul", "row", "column",
+			"pre", "section", "table", "ul",
+			
+			// Special to Onyx, but honestly should be standard:
+			"row", "column",
 		};
+
+		#endregion
+
+		#region Construction
 
 		public Element(string name)
 		{
 			NodeName = name;
+			_classNames = _emptyClassNames;
 		}
+
+		#endregion
+
+		#region Classname management
+
+		/// <summary>
+		/// Given a classname, split it on whitespace into one or more non-whitespace names.
+		/// </summary>
+		/// <param name="className">The classname to split.</param>
+		/// <returns>One or more classnames derived from the given source.</returns>
+		internal static List<string> SplitClassname(string? className)
+		{
+			List<string> result = new List<string>();
+
+			if (string.IsNullOrEmpty(className))
+				return result;
+
+			int ptr = 0;
+			while (ptr < className.Length)
+			{
+				// Skip whitespace.
+				while (ptr < className.Length
+					&& className[ptr] <= 32)
+					ptr++;
+
+				// Collect non-whitespace.
+				int start = ptr;
+				while (ptr < className.Length
+					&& className[ptr] > 32)
+					ptr++;
+
+				if (ptr > start)
+					result.Add(className.Substring(start, ptr - start));
+			}
+
+			return result;
+		}
+
+		/// <summary>
+		/// Modify the classnames on this element by adding one or more to it (space-delimited).
+		/// </summary>
+		/// <param name="className">One or more space-delimited classnames to add.</param>
+		public void AddClass(string className)
+			=> UpdateClassesInternal(SplitClassname(className), Array.Empty<string>());
+
+		/// <summary>
+		/// Modify the classnames on this element by removing one or more from it (space-delimited).
+		/// </summary>
+		/// <param name="className">One or more space-delimited classnames to remove.</param>
+		public void RemoveClass(string className)
+			=> UpdateClassesInternal(Array.Empty<string>(), SplitClassname(className));
+
+		/// <summary>
+		/// Modify the classnames on this element by toggling one or more on it (space-delimited).
+		/// "Toggling" means adding a classname if it doesn't already exist, or removing
+		/// it if it does already exist.
+		/// </summary>
+		/// <param name="className">One or more space-delimited classnames to add or remove.</param>
+		public void ToggleClass(string className)
+			=> ToggleClassesInternal(SplitClassname(className));
+
+		/// <summary>
+		/// Modify the classnames on this element by adding one or more to it (space-delimited),
+		/// and also removing one or more from it (also space-delimited).  Removing classes will
+		/// occur *before* adding classes, so any classname included in both sets will be added.
+		/// </summary>
+		/// <param name="add">One or more space-delimited classnames to add.</param>
+		/// <param name="remove">One or more space-delimited classnames to remove.</param>
+		public void UpdateClass(string add, string remove)
+			=> UpdateClassesInternal(SplitClassname(add), SplitClassname(remove));
+
+		/// <summary>
+		/// Internal mechanics for adding or removing one or more classes in bulk.
+		/// </summary>
+		/// <param name="adds">Classnames to add.</param>
+		/// <param name="removes">Classnames to remove.</param>
+		internal void UpdateClassesInternal(IEnumerable<string> adds, IEnumerable<string> removes)
+		{
+			HashSet<string> clone = new HashSet<string>(_classNames);
+
+			bool changed = false;
+			foreach (string name in adds)
+				changed |= clone.Add(name);
+			foreach (string name in removes)
+				changed |= clone.Remove(name);
+
+			if (changed)
+				ClassName = string.Join(' ', clone.OrderBy(c => c));
+		}
+
+		/// <summary>
+		/// Internal mechanics for toggling one or more classes in bulk.
+		/// </summary>
+		/// <param name="names">Classnames to add or remove.</param>
+		internal void ToggleClassesInternal(IEnumerable<string> names)
+		{
+			HashSet<string> clone = new HashSet<string>(_classNames);
+
+			bool changed = false;
+			foreach (string name in names)
+			{
+				if (clone.Contains(name))
+					clone.Remove(name);
+				else
+					clone.Add(name);
+				changed = true;
+			}
+
+			if (changed)
+				ClassName = string.Join(' ', clone.OrderBy(c => c));
+		}
+
+		#endregion
 
 		public override Node CloneNode(bool deep = false)
 		{
 			Element clone = new Element(NodeName);
 			clone.SourceLocation = SourceLocation;
 
-			if (AttributesDict != null)
+			if (_attributes != null)
 			{
-				NamedNodeMap cloneAttributes = clone.Attributes;
-				foreach (KeyValuePair<string, string> pair in AttributesDict)
+				AttributeDictionary cloneAttributes = clone.Attributes;
+				foreach (KeyValuePair<string, string> pair in _attributes)
 					cloneAttributes.Add(pair.Key, pair.Value);
 			}
 
@@ -208,15 +312,11 @@ namespace Onyx.Html.Dom
 
 				fastLookupContainer?.RemoveDescendant(this);
 
-				_className = newValue ?? string.Empty;
-				_classNames = _className
-					.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-					.ToHashSet();
-
-				HashSet<string> diff = oldValue?
-					.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-					.ToHashSet() ?? new HashSet<string>();
+				HashSet<string> newClassNames = new HashSet<string>(SplitClassname(newValue));
+				HashSet<string> diff = new HashSet<string>(newClassNames);
 				diff.SymmetricExceptWith(_classNames);
+
+				_classNames = newClassNames;
 
 				fastLookupContainer?.AddDescendant(this);
 
@@ -249,8 +349,6 @@ namespace Onyx.Html.Dom
 			}
 		}
 
-		private static readonly CssParser _inlineStyleParser = new CssParser();
-
 		private StylePropertySet ParseInlineStyle()
 		{
 			_inlineStyleParser.Messages.Clear();
@@ -264,9 +362,9 @@ namespace Onyx.Html.Dom
 				: new CssLexer(inlineStyle, "<inline style>", _inlineStyleParser.Messages);
 
 			List<StyleProperty> properties = new List<StyleProperty>();
-		retry:
+			retry:
 			_inlineStyleParser.ParsePropertyDeclarations(lexer, properties);
-			if (lexer.Next().Kind != CssTokenKind.Eoi)	// Recover from floating garbage.
+			if (lexer.Next().Kind != CssTokenKind.Eoi)  // Recover from floating garbage.
 				goto retry;
 
 			return new StylePropertySet(properties);
@@ -336,5 +434,26 @@ namespace Onyx.Html.Dom
 		}
 
 		#endregion
+
+		private void AppendStartTag(StringBuilder stringBuilder)
+		{
+			stringBuilder.Append('<');
+
+			stringBuilder.Append(NodeName);
+
+			if (_attributes != null)
+			{
+				foreach (KeyValuePair<string, string> pair in _attributes)
+				{
+					stringBuilder.Append(' ');
+					stringBuilder.Append(pair.Value);
+				}
+			}
+
+			if (AutoClosingTags.Contains(NodeName))
+				stringBuilder.Append(" /");
+
+			stringBuilder.Append('>');
+		}
 	}
 }

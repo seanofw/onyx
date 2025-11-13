@@ -23,7 +23,7 @@ namespace Onyx.Css.Selectors
 		private static readonly PropertyInfo _attributesProperty =
 			typeof(Element).GetProperty(nameof(Element.Attributes), BindingFlags.Instance | BindingFlags.Public)!;
 		private static readonly MethodInfo _tryGetValueMethod =
-			typeof(NamedNodeMap).GetMethod(nameof(NamedNodeMap.TryGetValue), BindingFlags.Instance | BindingFlags.Public)!;
+			typeof(AttributeDictionary).GetMethod(nameof(AttributeDictionary.TryGetValue), BindingFlags.Instance | BindingFlags.Public)!;
 
 		private static readonly MethodInfo _equalsMethod =
 			typeof(string).GetMethod(nameof(string.Equals),

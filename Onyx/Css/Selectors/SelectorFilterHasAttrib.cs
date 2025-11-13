@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
@@ -22,7 +22,7 @@ namespace Onyx.Css.Selectors
 		private static readonly PropertyInfo _attributesProperty =
 			typeof(Element).GetProperty(nameof(Element.Attributes), BindingFlags.Instance | BindingFlags.Public)!;
 		private static readonly MethodInfo _containsKeyMethod =
-			typeof(NamedNodeMap).GetMethod(nameof(NamedNodeMap.ContainsKey), BindingFlags.Instance | BindingFlags.Public)!;
+			typeof(AttributeDictionary).GetMethod(nameof(AttributeDictionary.ContainsKey), BindingFlags.Instance | BindingFlags.Public)!;
 
 		public override Expression GetMatchExpression(ParameterExpression element)
 			=> Expression.Call(
