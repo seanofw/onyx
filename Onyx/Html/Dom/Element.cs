@@ -25,7 +25,11 @@ namespace Onyx.Html.Dom
 		/// The attributes of this element.  This is a dictionary-like construct that may
 		/// be modified live to affect the element.
 		/// </summary>
-		public AttributeDictionary Attributes => _attributes ??= new AttributeDictionary(this);
+		public AttributeDictionary Attributes
+		{
+			get => _attributes ??= new AttributeDictionary(this);
+			internal set => _attributes = value;
+		}
 		private AttributeDictionary? _attributes;
 
 		/// <summary>

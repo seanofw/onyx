@@ -60,6 +60,18 @@ namespace Onyx.Html.Dom
 		}
 
 		/// <summary>
+		/// Construct a new attribute dictionary.  This can only be done by the element that
+		/// owns it, so it's marked 'internal'.
+		/// </summary>
+		/// <param name="owner">The element that owns this.</param>
+		/// <param name="attributes">The attributes to start out with.</param>
+		internal AttributeDictionary(Element owner, Dictionary<string, string> attributes)
+		{
+			_owner = owner;
+			_attributes = attributes;
+		}
+
+		/// <summary>
 		/// Read or write an attribute value, by name.
 		/// </summary>
 		/// <param name="key">The name of the attribute value to read or write.</param>

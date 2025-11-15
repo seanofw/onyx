@@ -418,10 +418,11 @@ namespace Onyx.Html.Parsing
 			if (token.Attributes != null)
 			{
 				Dictionary<string, string> attributes = new Dictionary<string, string>();
-				element.AttributesDict = attributes;
+				element.Attributes = new AttributeDictionary(element, attributes);
 				foreach (KeyValuePair<string, string?> pair in token.Attributes)
 				{
 					attributes.TryAdd(pair.Key, pair.Value ?? string.Empty);
+					element.OnAttrChange(pair.Key, null, pair.Value ?? string.Empty);
 				}
 			}
 
