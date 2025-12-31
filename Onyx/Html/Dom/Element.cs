@@ -1,5 +1,4 @@
 using System.Data;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Onyx.Css;
@@ -420,18 +419,29 @@ namespace Onyx.Html.Dom
 		/// <returns>The current computed style for this element.</returns>
 		public ComputedStyle GetComputedStyle()
 		{
+			// If we already have a computed style cached, just return it.
 			if (_computedStyle != null)
 				return _computedStyle;
 
+			// If this element is not ultimately attached to a tree root that knows
+			// how to hold styles, then just return the default computed style.
 			if (Root is not IStyleRoot styleRoot)
 				return _computedStyle = ComputedStyle.Default;
 
+			// Retrieve the parent style, which may involve recursively invoking this
+			// method, and derive a new "empty" child style from it if necessary.
 			ComputedStyle? parentStyle = Parent is Element parentElement
 				? parentElement.GetComputedStyle().MakeChildStyle()
 				: null;
 
+			// Fully compute the child style:  Use the StyleManager's lookup tables to
+			// efficiently locate the selectors matching this element, filter by IsMatch(),
+			// then apply each one to the two immutable style trees provided, returning a
+			// new, final immutable style for this element, and cache the result.
 			_computedStyle = styleRoot.StyleManager.ComputeStyle(this, parentStyle);
 
+			// If the tree root thinks that this element is in need of styling, remove
+			// it from consideration now that the style has been computed.
 			styleRoot.StyleQueue.Remove(this);
 
 			return _computedStyle;
