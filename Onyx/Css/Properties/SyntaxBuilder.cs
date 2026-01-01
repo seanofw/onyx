@@ -1,8 +1,9 @@
-﻿using Onyx.Css.Properties.SyntaxDefinitions;
+using Onyx.Css.Properties.SyntaxDefinitions;
 using System.Runtime.CompilerServices;
 using Onyx.Css.Parsing;
 using System;
 using Onyx.Css.Types;
+using Onyx.Types;
 
 namespace Onyx.Css.Properties
 {

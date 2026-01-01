@@ -1,5 +1,5 @@
-﻿using Onyx.Css.Parsing;
-using Onyx.Css.Types;
+using Onyx.Css.Parsing;
+using Onyx.Types;
 
 namespace Onyx.Css.Properties.SyntaxDefinitions
 {

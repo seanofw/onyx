@@ -1,6 +1,6 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using Onyx.Css.Computed;
-using Onyx.Css.Types;
+using Onyx.Types;
 
 namespace Onyx.Css.Properties.KnownProperties
 {

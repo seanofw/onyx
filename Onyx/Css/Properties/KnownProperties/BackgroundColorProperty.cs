@@ -1,5 +1,5 @@
-﻿using Onyx.Css.Computed;
-using Onyx.Css.Types;
+using Onyx.Css.Computed;
+using Onyx.Types;
 
 namespace Onyx.Css.Properties.KnownProperties
 {

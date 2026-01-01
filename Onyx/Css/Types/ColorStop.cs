@@ -1,4 +1,6 @@
-﻿namespace Onyx.Css.Types
+using Onyx.Types;
+
+namespace Onyx.Css.Types
 {
 	public record struct ColorStop
 	{

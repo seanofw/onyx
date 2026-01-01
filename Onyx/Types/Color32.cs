@@ -1,9 +1,10 @@
-﻿using System.Diagnostics.Contracts;
+using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Onyx.Css.Parsing;
+using Onyx.Css.Types;
 
-namespace Onyx.Css.Types
+namespace Onyx.Types
 {
 	/// <summary>
 	/// A color, in 32-bit truecolor, with lots of operations to manipulate it.<br />

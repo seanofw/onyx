@@ -1,6 +1,7 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Onyx.Css.Types;
+using Onyx.Types;
 
 namespace Onyx.Css.Computed
 {

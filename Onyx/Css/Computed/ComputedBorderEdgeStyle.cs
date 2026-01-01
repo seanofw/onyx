@@ -1,5 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using Onyx.Css.Types;
+using Onyx.Types;
 
 namespace Onyx.Css.Computed
 {
