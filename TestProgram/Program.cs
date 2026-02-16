@@ -1,7 +1,9 @@
-﻿using Onyx.Css;
+using Onyx.Css;
 using Onyx.Css.Computed;
 using Onyx.Css.Parsing;
 using Onyx.Html.Dom;
+using Onyx.Types;
+using Onyx.Windows;
 
 namespace TestProgram
 {
@@ -9,6 +11,16 @@ namespace TestProgram
 	{
 		public static void Main(string[] args)
 		{
+			Window window = new Window(
+				title: "Hello, World",
+				size: new Size2i(640, 480),
+				minSize: new Size2i(160, 120),
+				maxSize: new Size2i(800, 600)
+			);
+			window.Show();
+
+			WindowsMessageQueue.Run();
+
 			//Element div = new Element("div");
 			//div.InnerHtml = "<em><strong>This</strong> is a test</em>";
 

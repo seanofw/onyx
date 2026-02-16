@@ -1,4 +1,4 @@
-﻿using Onyx.Html.Dom;
+using Onyx.Html.Dom;
 
 namespace Onyx.Css
 {
@@ -21,7 +21,7 @@ namespace Onyx.Css
 		/// enqueued, it is now assumed to have already been given a valid style.
 		/// </summary>
 		/// <param name="element">The element that no longer needs to be restyled.</param>
-		void Remove(Element element);
+		bool Remove(Element element);
 
 		/// <summary>
 		/// Remove the next element from the queue so it can be restyled.

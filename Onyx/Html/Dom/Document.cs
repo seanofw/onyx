@@ -1,6 +1,7 @@
 using System.Text;
+using Onyx.Boxes;
 using Onyx.Css;
-using Onyx.Html.Parsing;
+using Onyx.Types;
 
 namespace Onyx.Html.Dom
 {
@@ -10,7 +11,7 @@ namespace Onyx.Html.Dom
 	/// "root-like" functionality (but that may not necessary provide efficient lookups and queries
 	/// like this class does).
 	/// </summary>
-	public class Document : ContainerNode, IElementLookupContainer, IStyleRoot
+	public class Document : ContainerNode, IElementLookupContainer, IStyleRoot, IViewportRoot
 	{
 		ElementLookupTables IElementLookupContainer.ElementLookupTables => _elementLookupTables;
 		private ElementLookupTables _elementLookupTables = new ElementLookupTables();
@@ -29,11 +30,47 @@ namespace Onyx.Html.Dom
 			set => InnerHtml = value;
 		}
 
+		/// <summary>
+		/// Get or change the size of the viewport containing this document, in pixels.
+		/// </summary>
+		public Rect2d ViewportRect
+		{
+			get => _viewportRect;
+			set
+			{
+				if (_viewportRect != value)
+				{
+					_viewportRect = value;
+					OnViewportChanged();
+				}
+			}
+		}
+		private Rect2d _viewportRect = new Rect2d(0, 0, double.MaxValue, double.MaxValue);
+
+		/// <summary>
+		/// Get the calculated dimensions of the document, in pixels.
+		/// </summary>
+		public Rect2d DocumentRect { get; private set; }
+
+		/// <summary>
+		/// The root box of the render tree.
+		/// </summary>
+		public Box? Box { get; internal set; }
+
 		public IStyleManager StyleManager => _styleManager;
 		private readonly StyleManager _styleManager = new StyleManager();
 
 		public IStyleQueue StyleQueue => _styleQueue;
 		private readonly StyleQueue _styleQueue = new StyleQueue();
+
+		public IBoxQueue MeasureQueue => _measureQueue;
+		private readonly BoxQueue _measureQueue = new BoxQueue();
+
+		public IBoxQueue ArrangeQueue => _arrangeQueue;
+		private readonly BoxQueue _arrangeQueue = new BoxQueue();
+
+		public IBoxQueue PaintQueue => _paintQueue;
+		private readonly BoxQueue _paintQueue = new BoxQueue();
 
 		public Document(string? content = null)
 		{
@@ -107,5 +144,13 @@ namespace Onyx.Html.Dom
 
 		public IReadOnlyCollection<Element> GetElementsByTypeAttribute(string name)
 			=> _elementLookupTables.GetElementsByTypeAttribute(name);
+
+		protected virtual void OnViewportChanged()
+		{
+			if (Box != null)
+			{
+				Box.Flags |= BoxFlags.NeedsArrange;
+			}
+		}
 	}
 }
