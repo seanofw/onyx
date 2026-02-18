@@ -31,7 +31,7 @@ namespace Onyx.Css.Parsing
 		/// warnings will be emitted as errors.</param>
 		public CssPropertyParser(Messages? messages = null, bool strict = false)
 		{
-			Messages = new Messages();
+			Messages = messages ?? new Messages();
 			_strict = strict;
 		}
 

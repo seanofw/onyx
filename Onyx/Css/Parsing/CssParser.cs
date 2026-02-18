@@ -35,7 +35,7 @@ namespace Onyx.Css.Parsing
 		/// warnings will be emitted as errors.</param>
 		public CssParser(Messages? messages = null, bool strict = false)
 		{
-			Messages = new Messages();
+			Messages = messages ?? new Messages();
 			_strict = strict;
 
 			_selectorParser = new CssSelectorParser(messages, strict);
