@@ -185,7 +185,10 @@ namespace Onyx.Css
 
 			HashSet<StyleRule> candidates = new HashSet<StyleRule>(_genericIndex);
 
-			if (_idIndex.TryGetValue(element.Id, out List<StyleRule>? rules))
+			if (_elementNameIndex.TryGetValue(element.NodeName, out List<StyleRule>? rules))
+				candidates.UnionWith(rules);
+
+			if (_idIndex.TryGetValue(element.Id, out rules))
 				candidates.UnionWith(rules);
 
 			foreach (string className in element.ClassNames)
