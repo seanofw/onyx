@@ -59,7 +59,8 @@ Current implementation status:
 * Flexbox: 0%
 * Tables: 0%
 * Render pipeline: 0%
-* SkiaSharp backend: 0%
+* SkiaSharp backend: 25%
+* Windows backend: 50%
 * Event management: 0%
 
 ## Installation
