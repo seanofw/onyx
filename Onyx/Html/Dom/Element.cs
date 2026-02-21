@@ -288,7 +288,7 @@ namespace Onyx.Html.Dom
 			return clone;
 		}
 
-		protected internal virtual void OnAttrChange(string? name, string? newValue, string? oldValue)
+		protected internal virtual void OnAttrChange(string? name, string? oldValue, string? newValue)
 		{
 			if (name == "id")
 			{
