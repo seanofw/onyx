@@ -3,12 +3,12 @@ using System.Text;
 
 namespace Onyx.Css.Types.Media
 {
-	public sealed class MediaQueryFalse : MediaQuery
+	public sealed class MediaQueryNotSupported : MediaQuery
 	{
-		public static MediaQueryFalse Instance { get; } = new MediaQueryFalse();
+		public static MediaQueryNotSupported Instance { get; } = new MediaQueryNotSupported();
 
-		private MediaQueryFalse()
-			: base(MediaQueryKind.False, usesDimensions: false, hasErrors: false)
+		private MediaQueryNotSupported()
+			: base(MediaQueryKind.NotSupported, usesDimensions: false, hasErrors: false)
 		{
 		}
 
@@ -20,7 +20,7 @@ namespace Onyx.Css.Types.Media
 
 		public override void ToString(StringBuilder dest)
 		{
-			dest.Append("false");
+			dest.Append("not-supported");
 		}
 	}
 }

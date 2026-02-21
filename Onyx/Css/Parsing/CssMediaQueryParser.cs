@@ -51,11 +51,60 @@ namespace Onyx.Css.Parsing
 
 			MediaQuery? mediaQuery = MediaQueryNull.Instance;
 
-			MediaQuery? next;
-			while ((next = ParseMediaQuery(lexer, expectEoi: false)) != null)
+			CssToken commaToken;
+			do
 			{
-				mediaQuery = new MediaQueryOr(mediaQuery, next);
+				MediaQuery? next = ParseMediaQuery(lexer, expectEoi: false);
+
+				// We may have a syntax error in the last query we read.  In order
+				// to recover well, we really want to consume until the next ',' or '{'
+				// or ';' or '}' or ']' or ')' so that we at least have a chance of
+				// recognizing the rest of the media query.  It's still a broken media
+				// query either way, but we're trying to help the developer have better
+				// error messages if we can.
+				CssParser.SkipWhitespace(lexer);
+
+				if ((commaToken = lexer.Next()).Kind != CssTokenKind.Comma
+					&& commaToken.Kind != CssTokenKind.Semicolon
+					&& commaToken.Kind != CssTokenKind.LeftBrace
+					&& commaToken.Kind != CssTokenKind.RightBrace
+					&& commaToken.Kind != CssTokenKind.RightBracket
+					&& commaToken.Kind != CssTokenKind.RightParen
+					&& commaToken.Kind != CssTokenKind.Eoi)
+				{
+					// This query is surely broken, so mark it as "...and error".
+					if (next == null || !next.HasErrors)
+						next = next != null
+							? new MediaQueryAnd(next, MediaQueryError.Instance)
+							: MediaQueryError.Instance;
+
+					// Try to recover.
+					do
+					{
+						lexer.Unget(commaToken);
+						CssParser.CollectOneInvalidToken(lexer);
+						CssParser.SkipWhitespace(lexer);
+					} while ((commaToken = lexer.Next()).Kind != CssTokenKind.Comma
+						&& commaToken.Kind != CssTokenKind.Semicolon
+						&& commaToken.Kind != CssTokenKind.LeftBrace
+						&& commaToken.Kind != CssTokenKind.RightBrace
+						&& commaToken.Kind != CssTokenKind.RightBracket
+						&& commaToken.Kind != CssTokenKind.RightParen
+						&& commaToken.Kind != CssTokenKind.Eoi);
+				}
+
+				lexer.Unget(commaToken);
+
+				if (next != null)
+				{
+					mediaQuery = mediaQuery != MediaQueryNull.Instance
+						? new MediaQueryOr(mediaQuery, next, isComma: true)
+						: next;
+				}
 			}
+			while ((commaToken = lexer.Next()).Kind == CssTokenKind.Comma);
+
+			lexer.Unget(commaToken);
 
 			if (expectEoi)
 			{
@@ -93,25 +142,32 @@ namespace Onyx.Css.Parsing
 			else if (TryConsumeKeyword(lexer, "only"))
 				{ /* OK */ }
 
+			CssParser.SkipWhitespace(lexer);
+
 			CssToken token = lexer.Peek();
-			if (!_mediaTypeParser.TryConsume(lexer, out MediaType mediaType))
+			if (token.Kind != CssTokenKind.Ident)
 			{
 				Warn(token.SourceLocation, "Missing required media type to start media query");
 				goto fail;
 			}
-			mediaQuery = new MediaQueryMediaType(mediaType);
+
+			mediaQuery = _mediaTypeParser.TryConsume(lexer, out MediaType mediaType)
+				? new MediaQueryMediaType(mediaType)
+				: MediaQueryError.Instance;
 
 			if (not)
 				mediaQuery = new MediaQueryNot(mediaQuery);
 
 			if (TryConsumeKeyword(lexer, "and"))
 			{
+				CssParser.SkipWhitespace(lexer);
+
 				token = lexer.Peek();
 				MediaQuery? and = ParseMediaCondition(lexer, allowOr: false);
 				if (and == null)
 				{
 					Warn(token.SourceLocation, "Invalid 'and' expression in media query");
-					goto fail;
+					and = MediaQueryError.Instance;
 				}
 				mediaQuery = new MediaQueryAnd(mediaQuery, and);
 			}
@@ -123,7 +179,9 @@ namespace Onyx.Css.Parsing
 				if ((token = lexer.Next()).Kind != CssTokenKind.Eoi)
 				{
 					Warn(token.SourceLocation, "Syntax error in media query expression");
-					goto fail;
+					mediaQuery = mediaQuery != null && mediaQuery != MediaQueryNull.Instance
+						? new MediaQueryAnd(mediaQuery, MediaQueryError.Instance)
+						: MediaQueryError.Instance;
 				}
 			}
 
@@ -148,6 +206,8 @@ namespace Onyx.Css.Parsing
 			if (mediaQuery == null)
 				goto fail;
 
+			CssParser.SkipWhitespace(lexer);
+
 			CssToken token;
 			if ((token = lexer.Peek()).Kind == CssTokenKind.Ident)
 			{
@@ -164,7 +224,7 @@ namespace Onyx.Css.Parsing
 					MediaQuery? or;
 					while ((or = ParseMediaNotAndOr(lexer, "or")) != null)
 					{
-						mediaQuery = new MediaQueryOr(mediaQuery, or);
+						mediaQuery = new MediaQueryOr(mediaQuery, or, isComma: false);
 					}
 				}
 			}
@@ -193,13 +253,12 @@ namespace Onyx.Css.Parsing
 				if (mediaQuery == null)
 				{
 					Warn(token.SourceLocation, $"Invalid media query expression after '{keyword}'");
-					goto fail;
+					return MediaQueryError.Instance;
 				}
 
 				return mediaQuery;
 			}
 
-		fail:
 			lexer.Rewind(position);
 			return null;
 		}
@@ -221,21 +280,33 @@ namespace Onyx.Css.Parsing
 
 				if (mediaQuery != null)
 				{
+					CssParser.SkipWhitespace(lexer);
 					if ((token = lexer.Next()).Kind == CssTokenKind.RightParen)
 						return mediaQuery;
 				}
 				else
 				{
 					CssParser.CollectInvalidTokens(lexer);
+
+					CssParser.SkipWhitespace(lexer);
 					if ((token = lexer.Next()).Kind == CssTokenKind.RightParen)
-						return null;
+						return MediaQueryError.Instance;
 				}
+
+				Warn(token.SourceLocation, "Missing right parenthesis after expression.");
+				mediaQuery = MediaQueryError.Instance;
+				return mediaQuery;
 			}
 			else if (token.Kind == CssTokenKind.Func)
 			{
 				CssParser.CollectInvalidTokens(lexer);
+
+				CssParser.SkipWhitespace(lexer);
 				if ((token = lexer.Next()).Kind == CssTokenKind.RightParen)
-					return null;
+					return MediaQueryError.Instance;
+
+				Warn(token.SourceLocation, "Missing right parenthesis after expression.");
+				return MediaQueryError.Instance;
 			}
 
 			lexer.Rewind(position);
@@ -254,7 +325,8 @@ namespace Onyx.Css.Parsing
 
 			CssParser.SkipWhitespace(lexer);
 
-			if (!_mediaFeatureParser.TryConsume(lexer, out MediaFeature feature))
+			MediaFeature feature;
+			if (lexer.Peek().Kind != CssTokenKind.Ident)
 			{
 				// Doesn't start with a feature, so it's not anything we know how to parse;
 				// bail to <mf-range>, which maybe knows how to parse this instead.
@@ -262,6 +334,15 @@ namespace Onyx.Css.Parsing
 				return ParseRange(lexer);
 			}
 
+			if (!_mediaFeatureParser.TryConsume(lexer, out feature))
+			{
+				feature = MediaFeature.Unknown;
+				lexer.Next();	// It was at least an ident, so we can try to eat it.
+			}
+
+			CssParser.SkipWhitespace(lexer);
+
+			CssToken featureToken = lexer.Peek();
 			Type? type = MediaQueryFeature.GetFeatureType(feature);
 
 			CssParser.SkipWhitespace(lexer);
@@ -269,9 +350,22 @@ namespace Onyx.Css.Parsing
 			CssToken operatorToken = lexer.Next();
 			if (operatorToken.Kind == CssTokenKind.Colon)
 			{
+				// Turn "min-X: N" and "max-X: N" into "X >= N" and "X <= N", respectively.
+				MediaQueryKind kind = MediaQueryKind.Eq;
+				if ((feature & MediaFeature.Min) != 0)
+				{
+					feature &= ~MediaFeature.Min;
+					kind = MediaQueryKind.Ge;
+				}
+				else if ((feature & MediaFeature.Max) != 0)
+				{
+					feature &= ~MediaFeature.Max;
+					kind = MediaQueryKind.Le;
+				}
+
 				// <mf-plain> = <mf-name> : <mf-value>
 				object? value = ParseValue(lexer);
-				MediaQuery? mediaQuery = CreateMediaQueryComparison(operatorToken.SourceLocation, MediaQueryKind.Eq, feature, value);
+				MediaQuery? mediaQuery = CreateMediaQueryComparison(operatorToken.SourceLocation, kind, feature, value);
 				if (mediaQuery != null)
 					return mediaQuery;
 
@@ -282,7 +376,14 @@ namespace Onyx.Css.Parsing
 				|| operatorToken.Kind == CssTokenKind.LessThan
 				|| operatorToken.Kind == CssTokenKind.GreaterThan)
 			{
+				if ((feature & (MediaFeature.Min | MediaFeature.Max)) != 0)
+				{
+					Warn(featureToken.SourceLocation, $"Media feature '{feature.ToString().Hyphenize()}' not allowed in comparison.");
+					feature = MediaFeature.Unknown;
+				}
+
 				// <mf-range> = <mf-name> <mf-comparison> <mf-value>
+				lexer.Unget(operatorToken);
 				MediaQueryKind kind = ParseComparison(lexer);
 				if (kind != MediaQueryKind.Unknown)
 				{
@@ -296,6 +397,12 @@ namespace Onyx.Css.Parsing
 				return null;
 			}
 			else lexer.Unget(operatorToken);
+
+			if ((feature & (MediaFeature.Min | MediaFeature.Max)) != 0)
+			{
+				Warn(featureToken.SourceLocation, $"Media feature '{feature.ToString().Hyphenize()}' requires a value to compare against.");
+				feature = MediaFeature.Unknown;
+			}
 
 			// Plain form, where we have to cast just the feature name itself to a boolean.
 			// This requires very cursed parsing rules :(
@@ -312,7 +419,7 @@ namespace Onyx.Css.Parsing
 					? MediaQueryComparison.CreateEnum(MediaQueryKind.Eq, feature, MediaOverflowMode.None)
 				: type == typeof(MediaUpdateMode)
 					? MediaQueryComparison.CreateEnum(MediaQueryKind.Eq, feature, MediaUpdateMode.None)
-				: MediaQueryNull.Instance
+				: MediaQueryError.Instance
 			);
 		}
 
@@ -327,20 +434,40 @@ namespace Onyx.Css.Parsing
 
 			object? value = ParseValue(lexer);
 			if (value == null)
-				goto fail;
+				return MediaQueryError.Instance;
+
+			CssParser.SkipWhitespace(lexer);
 
 			CssToken token = lexer.Peek();
 			MediaQueryKind firstComparison = ParseComparison(lexer);
 			if (firstComparison == MediaQueryKind.Unknown)
 			{
 				Warn(token.SourceLocation, $"Missing comparison operator after value '{value}'");
-				goto fail;
+				return MediaQueryError.Instance;
 			}
 
-			if (!_mediaFeatureParser.TryConsume(lexer, out MediaFeature feature))
+			CssParser.SkipWhitespace(lexer);
+
+			CssToken featureToken = lexer.Peek();
+			MediaFeature feature;
+			if (featureToken.Kind == CssTokenKind.Ident)
 			{
-				Warn(token.SourceLocation, $"Missing media feature name to compare to value '{value}'");
-				goto fail;
+				if (!_mediaFeatureParser.TryConsume(lexer, out feature))
+				{
+					Warn(featureToken.SourceLocation, $"Unknown media feature '{featureToken.Text}'");
+					feature = MediaFeature.Unknown;
+					lexer.Next();	// It was at least an ident, so we can eat it.
+				}
+				if ((feature & (MediaFeature.Min | MediaFeature.Max)) != 0)
+				{
+					Warn(featureToken.SourceLocation, $"Media feature '{feature.ToString().Hyphenize()}' not allowed in comparison.");
+					feature = MediaFeature.Unknown;
+				}
+			}
+			else
+			{
+				Warn(featureToken.SourceLocation, $"Missing media feature name to compare to value '{value}'");
+				feature = MediaFeature.Unknown;
 			}
 
 			Type? type = MediaQueryFeature.GetFeatureType(feature);
@@ -354,15 +481,17 @@ namespace Onyx.Css.Parsing
 				if (mediaQuery != null)
 					return mediaQuery;
 
-				goto fail;
+				return MediaQueryError.Instance;
 			}
 
 			// <mf-value> <mf-comparison> <mf-name> <mf-comparison> <mf-value>
 
+			CssParser.SkipWhitespace(lexer);
+
 			CssToken secondToken = lexer.Peek();
 			object? secondValue = ParseValue(lexer);
 			if (secondValue == null)
-				goto fail;
+				return MediaQueryError.Instance;
 
 			// The comparisons must describe ranges.
 			if (firstComparison != MediaQueryKind.Lt
@@ -371,7 +500,7 @@ namespace Onyx.Css.Parsing
 				&& firstComparison != MediaQueryKind.Ge)
 			{
 				Warn(secondToken.SourceLocation, $"Comparison operators for ranges must be '<' or '<=' or '>' or '>=' operators");
-				goto fail;
+				return MediaQueryError.Instance;
 			}
 
 			// The comparison pairs must be compatible.
@@ -379,13 +508,13 @@ namespace Onyx.Css.Parsing
 				&& !(secondComparison == MediaQueryKind.Lt || secondComparison == MediaQueryKind.Le))
 			{
 				Warn(secondToken.SourceLocation, $"Second comparison operator for range does not match the first");
-				goto fail;
+				return MediaQueryError.Instance;
 			}
 			if ((firstComparison == MediaQueryKind.Gt || firstComparison == MediaQueryKind.Ge)
 				&& !(secondComparison == MediaQueryKind.Gt || secondComparison == MediaQueryKind.Ge))
 			{
 				Warn(secondToken.SourceLocation, $"Second comparison operator for range does not match the first");
-				goto fail;
+				return MediaQueryError.Instance;
 			}
 
 			// Transform the range comparison into a straightforward (a < x && x < b) style
@@ -393,20 +522,15 @@ namespace Onyx.Css.Parsing
 			// to the bottom of the expression tree anyway, so there's no point in holding onto it
 			// as a first-class range.
 
-			MediaQuery? mediaQuery1 = CreateMediaQueryComparison(token.SourceLocation,
-				MediaQueryComparison.FlipComparison(firstComparison), feature, value);
-			if (mediaQuery1 == null)
-				goto fail;
+			MediaQuery mediaQuery1 = CreateMediaQueryComparison(token.SourceLocation,
+				MediaQueryComparison.FlipComparison(firstComparison), feature, value)
+				?? MediaQueryError.Instance;
 
-			MediaQuery? mediaQuery2 = CreateMediaQueryComparison(secondToken.SourceLocation, secondComparison, feature, secondValue);
-			if (mediaQuery2 == null)
-				goto fail;
+			MediaQuery mediaQuery2 = CreateMediaQueryComparison(secondToken.SourceLocation,
+				secondComparison, feature, secondValue)
+				?? MediaQueryError.Instance;
 
 			return new MediaQueryAnd(mediaQuery1, mediaQuery2);
-
-		fail:
-			lexer.Rewind(position);
-			return null;
 		}
 
 		// <mf-lt> = . '<' '='?
@@ -454,7 +578,7 @@ namespace Onyx.Css.Parsing
 			else
 			{
 				Warn(location, $"Feature '{feature.ToString().Hyphenize()}' cannot be compared to value '{value}' because they are different types");
-				return null;
+				return MediaQueryError.Instance;
 			}
 		}
 

@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Onyx.Css.Types.Media
 {
@@ -23,9 +24,23 @@ namespace Onyx.Css.Types.Media
 
 		public override Expression GetExpression(ParameterExpression param)
 			=> Expression.Call(null, _kleeneNotMethod,
-				Child.GetExpression(param));
+				MaybeConvert(Child.GetExpression(param), typeof(bool?)));
 
-		public override string ToString()
-			=> $"(not {Child})";
+		private static Expression MaybeConvert(Expression expr, Type type)
+			=> expr.Type != type ? Expression.Convert(expr, type) : expr;
+
+		public override void ToString(StringBuilder dest)
+		{
+			dest.Append("not ");
+
+			if (Child is MediaQueryAnd || Child is MediaQueryOr)
+			{
+				dest.Append("(");
+				Child.ToString(dest);
+				dest.Append(")");
+			}
+			else
+				Child.ToString(dest);
+		}
 	}
 }

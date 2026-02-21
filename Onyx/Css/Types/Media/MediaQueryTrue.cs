@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Text;
 
 namespace Onyx.Css.Types.Media
 {
@@ -7,7 +8,7 @@ namespace Onyx.Css.Types.Media
 		public static MediaQueryTrue Instance { get; } = new MediaQueryTrue();
 
 		private MediaQueryTrue()
-			: base(MediaQueryKind.True)
+			: base(MediaQueryKind.True, usesDimensions: false, hasErrors: false)
 		{
 		}
 
@@ -16,5 +17,10 @@ namespace Onyx.Css.Types.Media
 
 		public override Expression GetExpression(ParameterExpression param)
 			=> Expression.Constant(true);
+
+		public override void ToString(StringBuilder dest)
+		{
+			dest.Append("true");
+		}
 	}
 }

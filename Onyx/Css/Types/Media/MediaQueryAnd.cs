@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Onyx.Css.Types.Media
 {
@@ -25,10 +26,37 @@ namespace Onyx.Css.Types.Media
 
 		public override Expression GetExpression(ParameterExpression param)
 			=> Expression.Call(null, _kleeneAndMethod,
-				Left.GetExpression(param),
-				Right.GetExpression(param));
+				MaybeConvert(Left.GetExpression(param), typeof(bool?)),
+				MaybeConvert(Right.GetExpression(param), typeof(bool?)));
 
-		public override string ToString()
-			=> $"({Left} and {Right})";
+		private static Expression MaybeConvert(Expression expr, Type type)
+			=> expr.Type != type ? Expression.Convert(expr, type) : expr;
+
+		public override void ToString(StringBuilder dest)
+		{
+			if (Left is MediaQueryOr)
+			{
+				dest.Append("(");
+				Left.ToString(dest);
+				dest.Append(")");
+			}
+			else
+			{
+				Left.ToString(dest);
+			}
+
+			dest.Append(" and ");
+
+			if (Right is MediaQueryOr)
+			{
+				dest.Append("(");
+				Right.ToString(dest);
+				dest.Append(")");
+			}
+			else
+			{
+				Right.ToString(dest);
+			}
+		}
 	}
 }

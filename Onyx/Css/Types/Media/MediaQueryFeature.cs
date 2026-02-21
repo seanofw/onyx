@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 using Onyx.Extensions;
 
 namespace Onyx.Css.Types.Media
@@ -9,7 +10,7 @@ namespace Onyx.Css.Types.Media
 		public MediaFeature Feature { get; }
 
 		public MediaQueryFeature(MediaFeature feature)
-			: base(MediaQueryKind.Feature)
+			: base(MediaQueryKind.Feature, GetHasDimensions(feature), hasErrors: false)
 		{
 			Feature = feature;
 		}
@@ -27,23 +28,6 @@ namespace Onyx.Css.Types.Media
 
 		private static MethodInfo _resolveValue = typeof(MediaQueryFeature).GetMethod(nameof(ResolveValue),
 			BindingFlags.NonPublic | BindingFlags.Static)!;
-
-		private static readonly Func<MediaQueryContext, object?>?[] _lookupFuncs =
-			new Func<MediaQueryContext, object?>?[(int)MediaFeature._Last_];
-
-		public static Func<MediaQueryContext, object?> GetLookupFunc(MediaFeature feature)
-			=> _lookupFuncs[(int)feature] ??= CreateLookupFunc(feature);
-
-		private static Func<MediaQueryContext, object?> CreateLookupFunc(MediaFeature feature)
-		{
-			ParameterExpression param = Expression.Parameter(typeof(MediaQueryContext), "x");
-
-			Expression<Func<MediaQueryContext, object?>> lambda = Expression.Lambda<Func<MediaQueryContext, object?>>(
-				GetExpression(feature, param), param);
-
-			Func<MediaQueryContext, object?> lookupFunc = lambda.Compile();
-			return lookupFunc;
-		}
 
 		public static Expression GetExpression(MediaFeature feature, ParameterExpression param)
 			=> feature switch
@@ -114,7 +98,7 @@ namespace Onyx.Css.Types.Media
 			};
 
 		public static Type? GetFeatureType(MediaFeature feature)
-			=> feature switch
+			=> (feature & ~(MediaFeature.Min | MediaFeature.Max)) switch
 			{
 				MediaFeature.Width => typeof(Measure),
 				MediaFeature.Height => typeof(Measure),
@@ -140,7 +124,19 @@ namespace Onyx.Css.Types.Media
 				_ => null,
 			};
 
-		public override string ToString()
-			=> Feature.ToString().Hyphenize();
+		private static bool GetHasDimensions(MediaFeature feature)
+			=> (feature & ~(MediaFeature.Min | MediaFeature.Max)) switch
+			{
+				MediaFeature.Width => true,
+				MediaFeature.Height => true,
+				MediaFeature.AspectRatio => true,
+				MediaFeature.Orientation => true,
+				_ => false,
+			};
+
+		public override void ToString(StringBuilder dest)
+		{
+			dest.Append(Feature.ToString().Hyphenize());
+		}
 	}
 }

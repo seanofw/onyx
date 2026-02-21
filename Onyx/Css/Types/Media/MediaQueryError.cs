@@ -3,12 +3,12 @@ using System.Text;
 
 namespace Onyx.Css.Types.Media
 {
-	public sealed class MediaQueryNull : MediaQuery
+	public sealed class MediaQueryError : MediaQuery
 	{
-		public static MediaQueryNull Instance { get; } = new MediaQueryNull();
+		public static MediaQueryError Instance { get; } = new MediaQueryError();
 
-		private MediaQueryNull()
-			: base(MediaQueryKind.Null, usesDimensions: false, hasErrors: false)
+		private MediaQueryError()
+			: base(MediaQueryKind.Error, usesDimensions: false, hasErrors: true)
 		{
 		}
 
@@ -16,11 +16,11 @@ namespace Onyx.Css.Types.Media
 			=> null;
 
 		public override Expression GetExpression(ParameterExpression param)
-			=> Expression.Constant(null);
+			=> Expression.Constant(null, typeof(bool?));
 
 		public override void ToString(StringBuilder dest)
 		{
-			dest.Append("null");
+			dest.Append("error");
 		}
 	}
 }

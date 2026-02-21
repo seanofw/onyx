@@ -1,4 +1,7 @@
+using System.Globalization;
 using System.Linq.Expressions;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Text;
 
 namespace Onyx.Css.Types.Media
 {
@@ -7,7 +10,7 @@ namespace Onyx.Css.Types.Media
 		public Measure Measure { get; }
 
 		public MediaQueryMeasure(Measure measure)
-			: base(MediaQueryKind.Measure)
+			: base(MediaQueryKind.Measure, usesDimensions: false, hasErrors: false)
 		{
 			Measure = measure;
 		}
@@ -21,7 +24,9 @@ namespace Onyx.Css.Types.Media
 		public object? GetValue(MediaQueryContext context)
 			=> Measure;
 
-		public override string ToString()
-			=> Measure.ToString();
+		public override void ToString(StringBuilder dest)
+		{
+			dest.Append(Measure.ToString());
+		}
 	}
 }

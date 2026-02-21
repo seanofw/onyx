@@ -10,6 +10,8 @@ namespace Onyx.Css.Types.Media
 		Number,
 		Enum,
 
+		Error,
+		NotSupported,
 		Null,
 		False,
 		True,

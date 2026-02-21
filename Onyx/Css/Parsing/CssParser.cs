@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Onyx.Css.Properties;
 using Onyx.Css.Selectors;
+using Onyx.Css.Types.Media;
 
 namespace Onyx.Css.Parsing
 {
@@ -39,10 +40,10 @@ namespace Onyx.Css.Parsing
 			Messages = messages ?? new Messages();
 			_strict = strict;
 
-			_selectorParser = new CssSelectorParser(messages, strict);
-			_propertyParser = new CssPropertyParser(messages, strict);
-			_mediaQueryParser = new CssMediaQueryParser(messages, strict);
-			_supportsQueryParser = new CssSupportsQueryParser(messages, strict);
+			_selectorParser = new CssSelectorParser(messages, false);
+			_propertyParser = new CssPropertyParser(messages, false);
+			_mediaQueryParser = new CssMediaQueryParser(messages, false);
+			_supportsQueryParser = new CssSupportsQueryParser(messages, false);
 		}
 
 		#endregion
@@ -66,7 +67,7 @@ namespace Onyx.Css.Parsing
 		public Stylesheet Parse(CssLexer lexer)
 		{
 			List<StyleRule> rules = new List<StyleRule>();
-			ParseTopLevelDeclarations(lexer, rules, CssTokenKind.Eoi);
+			ParseTopLevelDeclarations(lexer, null, rules, CssTokenKind.Eoi);
 			return new Stylesheet(rules);
 		}
 
@@ -74,17 +75,18 @@ namespace Onyx.Css.Parsing
 		/// Parse CSS declarations until reaching a token that terminates this scope or EOI.
 		/// </summary>
 		/// <param name="lexer">The lexer providing the source tokens.</param>
+		/// <param name="mediaQuery">A media query constraining the applicability of the given rules.</param>
 		/// <param name="rules">The collection of rules that is being built.</param>
 		/// <param name="endingToken">A token that ends this scope, like 'RightBrace'.  If this
 		/// token is reached, it will be consumed.</param>
 		/// <returns>True if the expected ending token was reached, or false if the scope was
 		/// unterminated due to end-of-input.</returns>
-		private bool ParseTopLevelDeclarations(CssLexer lexer, ICollection<StyleRule> rules,
-			CssTokenKind endingToken)
+		private bool ParseTopLevelDeclarations(CssLexer lexer, MediaQuery? mediaQuery,
+			ICollection<StyleRule> rules, CssTokenKind endingToken)
 		{
 			while (true)
 			{
-				CssToken? badToken = ParseOneTopLevelDeclaration(lexer, rules);
+				CssToken? badToken = ParseOneTopLevelDeclaration(lexer, mediaQuery, rules);
 
 				if (badToken != null)
 				{
@@ -111,10 +113,12 @@ namespace Onyx.Css.Parsing
 		/// Attempt to parse a single top-level CSS declaration.
 		/// </summary>
 		/// <param name="lexer">The lexer providing the source tokens.</param>
+		/// <param name="mediaQuery">A media query constraining the applicability of the given rules.</param>
 		/// <param name="rules">The collection of rules that is being built.</param>
 		/// <returns>If no token could be consumed, this will be the failing token;
 		/// otherwise, this will be None.</returns>
-		private CssToken? ParseOneTopLevelDeclaration(CssLexer lexer, ICollection<StyleRule> rules)
+		private CssToken? ParseOneTopLevelDeclaration(CssLexer lexer, MediaQuery? mediaQuery,
+			ICollection<StyleRule> rules)
 		{
 			SkipWhitespace(lexer);
 
@@ -128,26 +132,16 @@ namespace Onyx.Css.Parsing
 
 			if (token.Kind == CssTokenKind.At)
 			{
-				// A CSS at-rule, most likely.  This should be followed by an identifier;
-				// if not, we discard it and attempt recovery to the next CSS declaration.
-				lexer.Next();
-				CssToken identToken;
-				string ident;
-				if ((identToken = lexer.Next()).Kind != CssTokenKind.Ident)
-				{
-					lexer.Unget(identToken);
-					ident = string.Empty;
-				}
-				else ident = identToken.Text ?? string.Empty;
-
+				// A CSS at-rule.
+				CssToken identToken = lexer.Next();
 				switch (identToken.Text ?? string.Empty)
 				{
 					case "media":
-						ParseMediaQuery(lexer, rules);
+						ParseMediaQuery(lexer, mediaQuery, rules);
 						break;
 
 					case "supports":
-						ParseSupportsQuery(lexer, rules);
+						ParseSupportsQuery(lexer, mediaQuery, rules);
 						break;
 
 					default:
@@ -184,7 +178,7 @@ namespace Onyx.Css.Parsing
 			}
 
 			if (selector != null)
-				rules.Add(new StyleRule(selector, new StylePropertySet(properties)));
+				rules.Add(new StyleRule(mediaQuery, selector, new StylePropertySet(properties)));
 
 			return null;
 		}
@@ -231,23 +225,65 @@ namespace Onyx.Css.Parsing
 		}
 
 		/// <summary>
-		/// Parse a "@media" query and its child declarations.
+		/// Parse a "@media" query and its child declarations.  The "@media" token will
+		/// have been read by this point.
 		/// </summary>
 		/// <param name="lexer">The lexer that provides tokens.</param>
+		/// <param name="mediaQuery">A media query constraining the applicability of the given rules.</param>
 		/// <param name="rules">The bag of rules being created.</param>
-		private void ParseMediaQuery(CssLexer lexer, ICollection<StyleRule> rules)
+		private void ParseMediaQuery(CssLexer lexer, MediaQuery? mediaQuery, ICollection<StyleRule> rules)
 		{
-			throw new NotImplementedException();
+			MediaQuery? childQuery = _mediaQueryParser.ParseMediaQueryList(lexer, expectEoi: false);
+
+			SkipWhitespace(lexer);
+
+			if (childQuery == null || lexer.Peek().Kind != CssTokenKind.LeftBrace)
+			{
+				// If necessary for bad syntax, apply recovery.
+				CssTokenKind kind;
+				while ((kind = lexer.Peek().Kind) != CssTokenKind.LeftBrace && kind != CssTokenKind.Eoi)
+				{
+					CollectOneInvalidToken(lexer);
+				}
+
+				SkipWhitespace(lexer);
+
+				if (childQuery == null || !childQuery.HasErrors)
+					childQuery = childQuery != null && childQuery != MediaQueryNull.Instance
+						? new MediaQueryAnd(childQuery, MediaQueryError.Instance)
+						: MediaQueryError.Instance;
+			}
+
+			mediaQuery = mediaQuery != null
+				? new MediaQueryAnd(mediaQuery, childQuery)
+				: childQuery;
+
+			// If we got to a ruleset, consume it.  It may not get used if we had to apply
+			// recovery, but at least we'll have read the rules in property.
+			CssToken token;
+			if ((token = lexer.Next()).Kind == CssTokenKind.LeftBrace)
+			{
+				if (ParseTopLevelDeclarations(lexer, mediaQuery, rules, CssTokenKind.RightBrace))
+					lexer.Next();
+			}
+			else
+			{
+				lexer.Unget(token);
+			}
 		}
 
 		/// <summary>
 		/// Parse a "@supports" query and its child declarations, which in Onyx can test
-		/// for property support and selector support...  by simply attempting to parse
-		/// those and then answering true or false for them.
+		/// for property support and selector support by simply attempting to parse
+		/// those and then answering true or false for them immediately.  If a particular
+		/// form is not supported, the rules are still parsed, but their media queries
+		/// are combined with 'not-supported' to prohibit them from being applied to
+		/// any elements.  We support both property tests and selector tests.
 		/// </summary>
 		/// <param name="lexer">The lexer that provides tokens.</param>
+		/// <param name="mediaQuery">A media query constraining the applicability of the given rules.</param>
 		/// <param name="rules">The bag of rules being created.</param>
-		private void ParseSupportsQuery(CssLexer lexer, ICollection<StyleRule> rules)
+		private void ParseSupportsQuery(CssLexer lexer, MediaQuery? mediaQuery, ICollection<StyleRule> rules)
 		{
 			throw new NotImplementedException();
 		}
@@ -277,74 +313,60 @@ namespace Onyx.Css.Parsing
 		/// </summary>
 		/// <param name="lexer">The lexer to eat invalid declarations from.</param>
 		/// <param name="tokens">The tokens being collected for the invalid property.</param>
-		internal static void CollectInvalidTokens(CssLexer lexer, ICollection<CssToken> tokens)
+		internal static void CollectInvalidTokens(CssLexer lexer, ICollection<CssToken>? tokens = null)
 		{
 			CssToken token;
 
-			while ((token = lexer.Next()).Kind != CssTokenKind.RightBrace
+			while ((token = lexer.Peek()).Kind != CssTokenKind.RightBrace
 				&& token.Kind != CssTokenKind.RightParen
 				&& token.Kind != CssTokenKind.RightBracket
 				&& token.Kind != CssTokenKind.Semicolon
 				&& token.Kind != CssTokenKind.Eoi)
 			{
-				if (token.Kind == CssTokenKind.LeftBrace)
+				CollectOneInvalidToken(lexer, tokens);
+			}
+		}
+
+		/// <summary>
+		/// Having consumed one invalid token, if it represents the start of a larger subtree
+		/// of invalid tokens, consume the rest of that subtree as well.
+		/// </summary>
+		/// <param name="lexer">The lexer to eat invalid declarations from.</param>
+		/// <param name="tokens">The tokens being collected for the invalid property.</param>
+		/// <returns></returns>
+		internal static void CollectOneInvalidToken(CssLexer lexer, ICollection<CssToken>? tokens = null)
+		{
+			static void CollectTo(CssTokenKind endKind, CssLexer lexer, ICollection<CssToken>? tokens)
+			{
+				while (true)
 				{
-					while (true)
+					CollectInvalidTokens(lexer, tokens);
+
+					CssToken token;
+					if ((token = lexer.Next()).Kind == CssTokenKind.Eoi)
 					{
-						CollectInvalidTokens(lexer, tokens);
-						if ((token = lexer.Next()).Kind == CssTokenKind.Eoi)
-						{
-							lexer.Unget(token);
+						lexer.Unget(token);
+						break;
+					}
+					else
+					{
+						tokens?.Add(token);
+						if (token.Kind == endKind)
 							break;
-						}
-						else
-						{
-							tokens.Add(token);
-							if (token.Kind == CssTokenKind.RightBrace)
-								break;
-						}
 					}
 				}
-				else if (token.Kind == CssTokenKind.LeftBracket)
-				{
-					while (true)
-					{
-						CollectInvalidTokens(lexer, tokens);
-						if ((token = lexer.Next()).Kind == CssTokenKind.Eoi)
-						{
-							lexer.Unget(token);
-							break;
-						}
-						else
-						{
-							tokens.Add(token);
-							if (token.Kind == CssTokenKind.RightBracket)
-								break;
-						}
-					}
-				}
-				else if (token.Kind == CssTokenKind.LeftParen)
-				{
-					while (true)
-					{
-						CollectInvalidTokens(lexer, tokens);
-						if ((token = lexer.Next()).Kind == CssTokenKind.Eoi)
-						{
-							lexer.Unget(token);
-							break;
-						}
-						else
-						{
-							tokens.Add(token);
-							if (token.Kind == CssTokenKind.RightParen)
-								break;
-						}
-					}
-				}
-				else tokens.Add(token);
 			}
 
-			lexer.Unget(token);
+			CssToken token = lexer.Next();
+
+			if (token.Kind == CssTokenKind.LeftBrace)
+				CollectTo(CssTokenKind.RightBrace, lexer, tokens);
+			else if (token.Kind == CssTokenKind.LeftBracket)
+				CollectTo(CssTokenKind.RightBracket, lexer, tokens);
+			else if (token.Kind == CssTokenKind.LeftParen)
+				CollectTo(CssTokenKind.RightParen, lexer, tokens);
+			else
+				tokens?.Add(token);
 		}
 
 		/// <summary>

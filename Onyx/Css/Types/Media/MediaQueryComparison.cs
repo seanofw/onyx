@@ -1,5 +1,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
+using Onyx.Extensions;
 
 namespace Onyx.Css.Types.Media
 {
@@ -30,41 +32,68 @@ namespace Onyx.Css.Types.Media
 			}
 
 			private MethodInfo _measure_CompareTo = typeof(Measure).GetMethod(nameof(Measure.CompareTo),
-				BindingFlags.Public | BindingFlags.Instance)!;
+				BindingFlags.Public | BindingFlags.Instance,
+				[typeof(Measure)])!;
+
+			private PropertyInfo _nullable_bool_HasValue = typeof(Nullable<bool>).GetProperty(
+				nameof(Nullable<bool>.HasValue), BindingFlags.Public | BindingFlags.Instance)!;
+
+			private PropertyInfo _nullable_bool_Value = typeof(Nullable<bool>).GetProperty(
+				nameof(Nullable<bool>.Value), BindingFlags.Public | BindingFlags.Instance)!;
+
+			private PropertyInfo _nullable_int_HasValue = typeof(Nullable<int>).GetProperty(
+				nameof(Nullable<int>.HasValue), BindingFlags.Public | BindingFlags.Instance)!;
+
+			private PropertyInfo _nullable_int_Value = typeof(Nullable<int>).GetProperty(
+				nameof(Nullable<int>.Value), BindingFlags.Public | BindingFlags.Instance)!;
 
 			public override Expression GetExpression(ParameterExpression param)
 			{
-				ParameterExpression resultVariable = Expression.Parameter(typeof(int), "result");
+				ParameterExpression nullableValueVariable = Expression.Parameter(typeof(int?), "nullableValue");
 
-				Expression valueExpression = Expression.Call(_convertAndCompare,
+				Expression nullableValueExpression = Expression.Call(_convertAndCompare,
 					MediaQueryFeature.GetExpression(Feature, param),
 					Expression.Constant(ComparisonValue));
 
-				Expression orderedValueExpression = valueExpression;
-				if (IsFlipped)
-					orderedValueExpression = Expression.Negate(orderedValueExpression);
+				Expression valueExpression = Expression.Property(nullableValueVariable, _nullable_int_Value);
 
-				Expression comparisonExpression = Kind switch
+				MediaQueryKind kind = IsFlipped ? FlipComparison(Kind) : Kind;
+
+				Expression comparisonExpression = kind switch
 				{
-					MediaQueryKind.Eq => Expression.Equal(orderedValueExpression, Expression.Constant(0)),
-					MediaQueryKind.Lt => Expression.LessThan(orderedValueExpression, Expression.Constant(0)),
-					MediaQueryKind.Gt => Expression.GreaterThan(orderedValueExpression, Expression.Constant(0)),
-					MediaQueryKind.Le => Expression.LessThanOrEqual(orderedValueExpression, Expression.Constant(0)),
-					MediaQueryKind.Ge => Expression.GreaterThanOrEqual(orderedValueExpression, Expression.Constant(0)),
+					MediaQueryKind.Eq => Expression.Equal(valueExpression, Expression.Constant(0)),
+					MediaQueryKind.Lt => Expression.LessThan(valueExpression, Expression.Constant(0)),
+					MediaQueryKind.Gt => Expression.GreaterThan(valueExpression, Expression.Constant(0)),
+					MediaQueryKind.Le => Expression.LessThanOrEqual(valueExpression, Expression.Constant(0)),
+					MediaQueryKind.Ge => Expression.GreaterThanOrEqual(valueExpression, Expression.Constant(0)),
 					_ => Expression.Constant(null),
 				};
 
-				return Expression.Block(typeof(bool),
-					[resultVariable],
+				Expression condition = Expression.Condition(
+					Expression.Property(nullableValueVariable, _nullable_int_HasValue),
+					Expression.Convert(
+						comparisonExpression,
+						typeof(bool?)
+					),
+					Expression.Constant(null, typeof(bool?))
+				);
+
+				// Generates the equivalent of:
+				//
+				//     {
+				//         int? nullableValue = ConvertAndCompare(feature..., ComparisonValue);
+				//         return nullableValue.HasValue ? (bool?)(nullableValue.Value [cmp] 0) : (bool?)null;
+				//     }
+				//
+				Expression result = Expression.Block(typeof(bool?),
+					[nullableValueVariable],
 					[
-						Expression.Assign(resultVariable, valueExpression),
-						Expression.IfThenElse(
-							Expression.Equal(resultVariable, Expression.Constant(null)),
-							Expression.Constant(null),
-							comparisonExpression
-						)
+						Expression.Assign(nullableValueVariable, nullableValueExpression),
+						condition
 					]
 				);
+
+				return result;
 			}
 
 			public override bool? Eval(MediaQueryContext context)
@@ -205,48 +234,48 @@ namespace Onyx.Css.Types.Media
 		public static MediaQuery Create(MediaQueryKind kind, MediaFeature left, Measure right)
 			=> MediaQueryFeature.GetFeatureType(left) == typeof(Measure)
 				? new MediaQueryMeasureComparison(kind, false, left, right)
-				: MediaQueryNull.Instance;
+				: MediaQueryError.Instance;
 
 		public static MediaQuery Create(MediaQueryKind kind, Measure left, MediaFeature right)
 			=> MediaQueryFeature.GetFeatureType(right) == typeof(Measure)
 				? new MediaQueryMeasureComparison(FlipComparison(kind), true, right, left)
-				: MediaQueryNull.Instance;
+				: MediaQueryError.Instance;
 
 		public static MediaQuery Create(MediaQueryKind kind, MediaFeature left, double right)
 			=> MediaQueryFeature.GetFeatureType(left) == typeof(double)
 				? new MediaQueryDoubleComparison(kind, false, left, right)
-				: MediaQueryNull.Instance;
+				: MediaQueryError.Instance;
 
 		public static MediaQuery Create(MediaQueryKind kind, double left, MediaFeature right)
 			=> MediaQueryFeature.GetFeatureType(right) == typeof(Measure)
 				? new MediaQueryDoubleComparison(FlipComparison(kind), true, right, left)
-				: MediaQueryNull.Instance;
+				: MediaQueryError.Instance;
 
 		public static MediaQuery CreateEnum<T>(MediaQueryKind kind, MediaFeature left, T right)
 			where T : struct
 			=> MediaQueryFeature.GetFeatureType(left) == typeof(T) && typeof(T).IsEnum && kind == MediaQueryKind.Eq
 				? new MediaQueryEnumComparison<T>(kind, false, left, right)
-				: MediaQueryNull.Instance;
+				: MediaQueryError.Instance;
 
 		public static MediaQuery CreateEnum<T>(MediaQueryKind kind, T left, MediaFeature right)
 			where T : struct
 			=> MediaQueryFeature.GetFeatureType(right) == typeof(T) && typeof(T).IsEnum && kind == MediaQueryKind.Eq
 				? new MediaQueryEnumComparison<T>(kind, true, right, left)
-				: MediaQueryNull.Instance;
+				: MediaQueryError.Instance;
 
 		public static MediaQuery CreateEnum(MediaQueryKind kind, MediaFeature left, Type rightType, object? rightValue)
 			=> MediaQueryFeature.GetFeatureType(left) == rightType && rightType.IsEnum && kind == MediaQueryKind.Eq
 				? (MediaQuery)Activator.CreateInstance(
 					typeof(MediaQueryEnumComparison<>).MakeGenericType(rightType),
 					kind, false, left, rightValue)!
-				: MediaQueryNull.Instance;
+				: MediaQueryError.Instance;
 
 		public static MediaQuery CreateEnum(MediaQueryKind kind, Type leftType, object? leftValue, MediaFeature right)
 			=> MediaQueryFeature.GetFeatureType(right) == leftType && leftType.IsEnum && kind == MediaQueryKind.Eq
 				? (MediaQuery)Activator.CreateInstance(
 					typeof(MediaQueryEnumComparison<>).MakeGenericType(leftType),
 					kind, true, right, leftValue)!
-				: MediaQueryNull.Instance;
+				: MediaQueryError.Instance;
 
 		internal static MediaQueryKind FlipComparison(MediaQueryKind kind)
 			=> kind switch
@@ -258,7 +287,23 @@ namespace Onyx.Css.Types.Media
 				_ => kind,
 			};
 
-		public override string ToString()
-			=> $"({Left} {Kind.ToString().ToLowerInvariant()} {Right})";
+		public override void ToString(StringBuilder dest)
+		{
+			dest.Append("(");
+			Left.ToString(dest);
+
+			dest.Append(Kind switch
+			{
+				MediaQueryKind.Lt => " < ",
+				MediaQueryKind.Gt => " > ",
+				MediaQueryKind.Le => " <= ",
+				MediaQueryKind.Ge => " >= ",
+				MediaQueryKind.Eq => " = ",
+				_ => " " + Kind.ToString().Hyphenize() + " ",
+			});
+
+			Right.ToString(dest);
+			dest.Append(")");
+		}
 	}
 }

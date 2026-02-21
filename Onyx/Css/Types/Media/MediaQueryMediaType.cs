@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Text;
 using Onyx.Extensions;
 
 namespace Onyx.Css.Types.Media
@@ -8,13 +9,10 @@ namespace Onyx.Css.Types.Media
 		public MediaType Type { get; }
 
 		public MediaQueryMediaType(MediaType type)
-			: base(MediaQueryKind.MediaType)
+			: base(MediaQueryKind.MediaType, usesDimensions: false, hasErrors: false)
 		{
 			Type = type;
 		}
-
-		public override string ToString()
-			=> Type.ToString().Hyphenize();
 
 		public override Expression GetExpression(ParameterExpression param)
 			=> Expression.Equal(
@@ -27,5 +25,10 @@ namespace Onyx.Css.Types.Media
 
 		public override bool? Eval(MediaQueryContext context)
 			=> context.MediaInfo.Type == Type;
+
+		public override void ToString(StringBuilder dest)
+		{
+			dest.Append(Type.ToString().Hyphenize());
+		}
 	}
 }

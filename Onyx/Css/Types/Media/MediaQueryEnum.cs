@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Text;
 using Onyx.Extensions;
 
 namespace Onyx.Css.Types.Media
@@ -9,7 +10,7 @@ namespace Onyx.Css.Types.Media
 		public T Value { get; }
 
 		public MediaQueryEnum(T value)
-			: base(MediaQueryKind.Enum)
+			: base(MediaQueryKind.Enum, usesDimensions: false, hasErrors: false)
 		{
 			Value = value;
 		}
@@ -23,7 +24,9 @@ namespace Onyx.Css.Types.Media
 		public object? GetValue(MediaQueryContext context)
 			=> Value;
 
-		public override string ToString()
-			=> Value.ToString()!.Hyphenize();
+		public override void ToString(StringBuilder dest)
+		{
+			dest.Append(Value.ToString()?.Hyphenize());
+		}
 	}
 }

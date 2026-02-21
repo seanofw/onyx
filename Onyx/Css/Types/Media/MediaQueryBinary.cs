@@ -6,7 +6,7 @@ namespace Onyx.Css.Types.Media
 		public MediaQuery Right { get; }
 
 		public MediaQueryBinary(MediaQueryKind kind, MediaQuery left, MediaQuery right)
-			: base(kind)
+			: base(kind, left.UsesDimensions || right.UsesDimensions, left.HasErrors || right.HasErrors)
 		{
 			Left = left;
 			Right = right;

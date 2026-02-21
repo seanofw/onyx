@@ -1,14 +1,18 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Onyx.Css.Types.Media
 {
 	public sealed class MediaQueryOr : MediaQueryBinary
 	{
-		public MediaQueryOr(MediaQuery left, MediaQuery right)
+		public bool IsComma { get; }
+
+		public MediaQueryOr(MediaQuery left, MediaQuery right, bool isComma)
 			: base(MediaQueryKind.Or, left, right)
 		{
+			IsComma = isComma;
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
@@ -25,10 +29,19 @@ namespace Onyx.Css.Types.Media
 
 		public override Expression GetExpression(ParameterExpression param)
 			=> Expression.Call(null, _kleeneOrMethod,
-				Left.GetExpression(param),
-				Right.GetExpression(param));
+				MaybeConvert(Left.GetExpression(param), typeof(bool?)),
+				MaybeConvert(Right.GetExpression(param), typeof(bool?)));
 
-		public override string ToString()
-			=> $"({Left} or {Right})";
+		private static Expression MaybeConvert(Expression expr, Type type)
+			=> expr.Type != type ? Expression.Convert(expr, type) : expr;
+
+		public override void ToString(StringBuilder dest)
+		{
+			Left.ToString(dest);
+
+			dest.Append(IsComma ? ", " : " or ");
+
+			Right.ToString(dest);
+		}
 	}
 }

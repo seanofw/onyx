@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Linq.Expressions;
+using System.Text;
 
 namespace Onyx.Css.Types.Media
 {
@@ -8,7 +9,7 @@ namespace Onyx.Css.Types.Media
 		public double Number { get; }
 
 		public MediaQueryNumber(double number)
-			: base(MediaQueryKind.Number)
+			: base(MediaQueryKind.Number, usesDimensions: false, hasErrors: false)
 		{
 			Number = number;
 		}
@@ -22,7 +23,9 @@ namespace Onyx.Css.Types.Media
 		public object? GetValue(MediaQueryContext context)
 			=> Number;
 
-		public override string ToString()
-			=> Number.ToString(CultureInfo.InvariantCulture);
+		public override void ToString(StringBuilder dest)
+		{
+			dest.Append(Number.ToString(CultureInfo.InvariantCulture));
+		}
 	}
 }
