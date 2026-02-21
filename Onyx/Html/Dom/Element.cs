@@ -357,7 +357,7 @@ namespace Onyx.Html.Dom
 		{
 			_inlineStyleParser.Messages.Clear();
 
-			string inlineStyle = Attributes["style"];
+			string inlineStyle = Attributes.TryGetValue("style", out string? s) ? s : string.Empty;
 			if (string.IsNullOrEmpty(inlineStyle))
 				return StylePropertySet.Empty;
 
@@ -439,7 +439,7 @@ namespace Onyx.Html.Dom
 			// efficiently locate the selectors matching this element, filter by IsMatch(),
 			// then apply each one to the two immutable style trees provided, returning a
 			// new, final immutable style for this element, and cache the result.
-			_computedStyle = styleRoot.StyleManager.ComputeStyle(this, parentStyle);
+			_computedStyle = styleRoot.StyleManager.ComputeStyle(styleRoot.MediaQueryContext, this, parentStyle);
 
 			// If the tree root thinks that this element is in need of styling, remove
 			// it from consideration now that the style has been computed.

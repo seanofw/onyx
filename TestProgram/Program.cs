@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using Onyx.Css;
 using Onyx.Css.Computed;
 using Onyx.Css.Parsing;
@@ -47,12 +46,10 @@ namespace TestProgram
 			IEnumerable<Node> nodes3 = document.Find("#frob").Find(".foo");
 
 			const string StylesheetText = @"
-@media screen and (min-width: 640px), print and (640px <= width <= 800px) {
-	input[type=text] {
-		border: 1px solid #CCC;
-		background: white;
-		font: 14px Arial;
-	}
+input[type=text] {
+	border: 1px solid #CCC;
+	background: white;
+	font: 14px Arial;
 }
 
 window {
@@ -66,9 +63,11 @@ window {
 	color: orange;
 }
 
-.foo {
-	color: red;
-	background: green;
+@media screen and (min-width: 640px) {
+	.foo {
+		color: red;
+		background: green;
+	}
 }
 ";
 
@@ -76,20 +75,12 @@ window {
 			Stylesheet stylesheet = parser.Parse(StylesheetText, "<inline>");
 			document.AddStylesheet(stylesheet);
 
-			ParameterExpression param = Expression.Parameter(typeof(MediaQueryContext), "x");
-			Expression body = stylesheet.Rules[0].MediaQuery!.GetExpression(param);
-			Expression<Func<MediaQueryContext, bool?>> evalExpression = Expression.Lambda<Func<MediaQueryContext, bool?>>(body, param);
-			Func<MediaQueryContext, bool?> eval = evalExpression.Compile();
+			document.MediaInfo = new MediaInfo(MediaType.Screen);
 
-			MediaQueryContext context = new MediaQueryContext(
-				new MediaDimensions(
-					width: new Measure(Units.Pixels, 320),
-					height: new Measure(Units.Pixels, 240)
-				),
-				new MediaInfo(MediaType.Braille)
+			document.MediaDimensions = new MediaDimensions(
+				width: new Measure(Units.Pixels, 640),
+				height: new Measure(Units.Pixels, 480)
 			);
-			bool? result1 = stylesheet.Rules[0].MediaQuery!.Eval(context);
-			bool? result2 = eval(context);
 
 			Element? foo = document.Get("#foo");
 

@@ -1,4 +1,6 @@
-﻿namespace Onyx.Css
+using Onyx.Css.Types.Media;
+
+namespace Onyx.Css
 {
 	/// <summary>
 	/// A Node tree root capable of supporting styling.
@@ -14,5 +16,10 @@
 		/// The style queue that knows what nodes need to be styled.
 		/// </summary>
 		IStyleQueue StyleQueue { get; }
+
+		/// <summary>
+		/// A media query context that can answer questions for styles that use @media rules.
+		/// </summary>
+		MediaQueryContext MediaQueryContext { get; }
 	}
 }

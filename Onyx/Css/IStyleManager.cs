@@ -1,6 +1,5 @@
 using Onyx.Css.Computed;
-using Onyx.Css.Properties;
-using Onyx.Css.Selectors;
+using Onyx.Css.Types.Media;
 using Onyx.Html.Dom;
 
 namespace Onyx.Css
@@ -61,20 +60,22 @@ namespace Onyx.Css
 		/// Look up styles for the given element.  
 		/// </summary>
 		/// <param name="element">The element to locate styles for.</param>
+		/// <param name="context">The context that describes how to answer media queries.</param>
 		/// <returns>*All* of the StylePropertySets that should be applied to
 		/// this element.  Note that they are not ordered by specificity, and those
 		/// that are overridden are still included, and shorthand properties are not
 		/// expanded:  The returned collection is the "raw" style collection, with
 		/// the correct specificity to apply for each property set.</returns>
-		IReadOnlyCollection<StylePropertySetWithSpecificity> GetStyleRules(Element element);
+		IReadOnlyCollection<StylePropertySetWithSpecificity> GetStyleRules(Element element, MediaQueryContext context);
 
 		/// <summary>
 		/// Compute the style for the given element, inheriting it (as necessary or as requested)
 		/// from the given parent style.
 		/// </summary>
 		/// <param name="element">The element whose style is to be computed.</param>
+		/// <param name="context">The context that describes how to answer media queries.</param>
 		/// <param name="parentStyle">The parent style to inherit from.</param>
 		/// <returns>The element's finished computed style.</returns>
-		ComputedStyle ComputeStyle(Element element, ComputedStyle? parentStyle);
+		ComputedStyle ComputeStyle(MediaQueryContext context, Element element, ComputedStyle? parentStyle);
 	}
 }

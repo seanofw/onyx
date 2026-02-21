@@ -1,6 +1,7 @@
 using System.Text;
 using Onyx.Css;
-using Onyx.Html.Parsing;
+using Onyx.Css.Types;
+using Onyx.Css.Types.Media;
 
 namespace Onyx.Html.Dom
 {
@@ -28,6 +29,37 @@ namespace Onyx.Html.Dom
 			get => InnerHtml;
 			set => InnerHtml = value;
 		}
+
+		MediaQueryContext IStyleRoot.MediaQueryContext
+			=> new MediaQueryContext(MediaDimensions, MediaInfo);
+
+		public MediaInfo MediaInfo
+		{
+			get => _mediaInfo;
+			set
+			{
+				if (!object.Equals(_mediaInfo, value))
+				{
+					_mediaInfo = value;
+					InvalidateChildComputedStyles();
+				}
+			}
+		}
+		private MediaInfo _mediaInfo = default;
+
+		public MediaDimensions MediaDimensions
+		{
+			get => _mediaDimensions;
+			set
+			{
+				if (!object.Equals(_mediaDimensions, value))
+				{
+					_mediaDimensions = value;
+					InvalidateChildComputedStyles();
+				}
+			}
+		}
+		private MediaDimensions _mediaDimensions = default;
 
 		public IStyleManager StyleManager => _styleManager;
 		private readonly StyleManager _styleManager = new StyleManager();
