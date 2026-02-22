@@ -1038,22 +1038,36 @@ Given an element, this method assembles a superset of all rules that could possi
 
 The result is a `HashSet<StyleRule>` — a deduplicated set of candidate rules that includes every rule that *might* match the element. Rules that reference a class or ID that the element doesn't have are excluded, which can eliminate the vast majority of rules in a large stylesheet.
 
-### GetStyleRules: verification and specificity tracking
+### GetStyleRules: media query filtering, verification, and specificity tracking
 
 ```
-GetStyleRules(element) → IReadOnlyCollection<StylePropertySetWithSpecificity>
+GetStyleRules(element, context) → IReadOnlyCollection<StylePropertySetWithSpecificity>
 ```
 
-This is the main entry point. It calls `FindCandidateRules()` to get candidates, then verifies each one:
+This is the main entry point. It calls `FindCandidateRules()` to get candidates, then filters and verifies each one:
 
 ```
 for each candidate rule:
+    if rule.MediaQuery != null:
+        evaluate media query against context (compiled delegate)
+        if result != true: skip this rule
     for each selector in rule.Selector.Selectors:     // (the CompoundSelector's comma-separated list)
         if selector.IsMatch(element):
             track the highest specificity among matching selectors
     if any selector matched:
         emit (rule.Properties, highestSpecificity)
 ```
+
+The media query gate is the first check for each candidate rule.  If the rule was
+declared inside an `@media` block, the parser will have attached the parsed
+`MediaQuery` expression tree to the `StyleRule`.  The compiled evaluator
+(`MediaQuery.GetEval()`) is used for performance — after the first invocation, the
+media query runs as JIT-compiled native code rather than interpreted tree traversal.
+Only rules whose media query evaluates to `true` proceed to selector matching; both
+`false` and `null` (indeterminate, per Kleene three-valued logic) cause the rule to be
+skipped.  Rules with no media query (declared outside any `@media` block) are
+unconditionally included.  For full details on media query parsing and evaluation, see
+[CSS Media Queries.md](CSS%20Media%20Queries.md).
 
 The result is a list of `StylePropertySetWithSpecificity` — each one is a bag of CSS property declarations paired with the specificity of the most-specific selector that caused it to match. Note that this is the *raw* result: properties may overlap or conflict, and shorthand properties are not yet expanded. The caller (`ComputeStyle()`) handles resolution.
 
@@ -1065,7 +1079,7 @@ When multiple selectors in the same `CompoundSelector` match the same element (e
 
 `StyleManager.ComputeStyle()` orchestrates the complete style computation for an element:
 
-1. **Collect matching rules**: Call `GetStyleRules(element)` to get all matching rule property sets with their specificities.
+1. **Collect matching rules**: Call `GetStyleRules(element, context)` to get all matching rule property sets with their specificities, filtering by `@media` queries where applicable.
 2. **Add inline styles**: If the element has a `style` attribute, its parsed inline styles are added with `Specificity.MaxValue` (ensuring they override all stylesheet rules, per CSS specification).
 3. **Resolve conflicts** (`ExtractMostSpecificStyles`): All property declarations are decomposed (shorthand properties like `margin` are expanded into `margin-top`, `margin-right`, etc.), then for each property kind, only the declaration with the highest specificity is kept. Ties at the same specificity are broken by the `!important` flag.
 4. **Apply to computed style**: Starting from the parent element's computed style (for inheritance) or the default style, each winning property declaration is applied to produce the final `ComputedStyle`.

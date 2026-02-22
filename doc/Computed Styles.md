@@ -12,7 +12,8 @@ The key files involved are:
 | `Css/StyleManager.cs` | `ComputeStyle()` — orchestrates the full pipeline; `GetStyleRules()` and `FindCandidateRules()` — the style rule engine |
 | `Css/StyleQueue.cs` | Tracks elements needing recomputation; provides batched processing |
 | `Css/Computed/ComputedStyle.cs` | The immutable, copy-on-write output object |
-| `Css/Stylesheet.cs`, `Css/StyleRule.cs` | The parsed stylesheet data |
+| `Css/Parsing/CssParser.cs` | Top-level stylesheet parser; orchestrates selector, property, and media query sub-parsers; threads `@media` queries onto `StyleRule` objects |
+| `Css/Stylesheet.cs`, `Css/StyleRule.cs` | The parsed stylesheet data; each `StyleRule` carries an optional `MediaQuery` from its enclosing `@media` block |
 | `Css/Properties/StyleProperty.cs` | The abstract base for all parsed property values |
 
 ---
@@ -67,7 +68,9 @@ The `StyleManager` maintains indexes over the **last simple selector** of every 
 
 **Phase 2 — Verification (`GetStyleRules`):**
 
-Each candidate rule's selectors are tested against the element using `Selector.IsMatch()` — the full IsMatch engine (documented in [Selector Matching.md](Selector%20Matching.md)), including right-to-left path walking and the adaptive JIT compiler for simple selectors. A compound selector (comma-separated) may contain multiple selectors; each is tested, and the **highest specificity** among matching selectors is recorded.
+Each candidate rule is first checked for a **media query gate**: if the rule was declared inside an `@media` block, its `StyleRule.MediaQuery` is non-null, and the media query is evaluated against the document's current `MediaQueryContext` (see [CSS Media Queries.md](CSS%20Media%20Queries.md)). The compiled evaluator (`MediaQuery.GetEval()`) is used for performance, and only rules whose media query evaluates to `true` proceed — both `false` and `null` (indeterminate, per Kleene logic) cause the rule to be skipped. Rules with no media query (i.e., those declared outside any `@media` block) are unconditionally included.
+
+Each surviving rule's selectors are then tested against the element using `Selector.IsMatch()` — the full IsMatch engine (documented in [Selector Matching.md](Selector%20Matching.md)), including right-to-left path walking and the adaptive JIT compiler for simple selectors. A compound selector (comma-separated) may contain multiple selectors; each is tested, and the **highest specificity** among matching selectors is recorded.
 
 The result is a list of `StylePropertySetWithSpecificity` — each pairing a rule's property declarations with the specificity of the most-specific matching selector.
 
@@ -155,6 +158,12 @@ Here is the complete flow from stylesheet to rendered style, showing how the doc
    ┌──────────────────────────────────────────────────┐
    │ document.AddStylesheet(cssText, filename)         │
    │   → CssLexer + CssParser → Stylesheet            │
+   │     CssParser orchestrates sub-parsers:           │
+   │       CssSelectorParser (selectors)               │
+   │       CssPropertyParser (property declarations)   │
+   │       CssMediaQueryParser (@media conditions)     │
+   │     Each @media block's query is attached to      │
+   │       every StyleRule inside that block            │
    │   → StyleManager indexes each rule's last         │
    │     simple selector into _elementNameIndex,       │
    │     _classNameIndex, _idIndex, _genericIndex      │
@@ -183,11 +192,12 @@ Here is the complete flow from stylesheet to rendered style, showing how the doc
    │   → parentStyle.MakeChildStyle()                  │
    │     (inherit inherited props, reset the rest)     │
    │                                                   │
-   │ StyleManager.ComputeStyle(element, parentStyle)   │
+   │ StyleManager.ComputeStyle(context, element, parent) │
    │   → FindCandidateRules(element)                   │
    │     (query indexes by element's tag, ID, classes) │
-   │   → GetStyleRules(element)                        │
-   │     (IsMatch each candidate; track specificity)   │
+   │   → GetStyleRules(element, context)               │
+   │     (filter by @media query if present;           │
+   │      IsMatch each candidate; track specificity)   │
    │   → Add inline styles at Specificity.MaxValue     │
    │   → ExtractMostSpecificStyles()                   │
    │     (decompose shorthands, pick highest-spec      │
@@ -199,7 +209,7 @@ Here is the complete flow from stylesheet to rendered style, showing how the doc
    └──────────────────────────────────────────────────┘
 ```
 
-The entire process is designed so that the expensive parts (parsing stylesheets, building indexes) happen once at startup, while the frequent parts (invalidation checks, style recomputation) are as cheap as possible. The style rule engine's indexes narrow the candidate set before `IsMatch()` is called; the `IsMatch()` engine's adaptive JIT compiler ensures that selectors used more than twice run at near-native speed; and the selective invalidation logic avoids unnecessary recomputation when attributes change that no selector references. The result is a system where changing an element's class at runtime and reading back its computed style is fast enough for interactive use.
+The entire process is designed so that the expensive parts (parsing stylesheets, building indexes) happen once at startup, while the frequent parts (invalidation checks, style recomputation) are as cheap as possible. The style rule engine's indexes narrow the candidate set before `IsMatch()` is called; media queries are evaluated via JIT-compiled delegates so that `@media` filtering adds negligible cost per rule; the `IsMatch()` engine's adaptive JIT compiler ensures that selectors used more than twice run at near-native speed; and the selective invalidation logic avoids unnecessary recomputation when attributes change that no selector references. The result is a system where changing an element's class at runtime and reading back its computed style is fast enough for interactive use.
 
 ---
 
