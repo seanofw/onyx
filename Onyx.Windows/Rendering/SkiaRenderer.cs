@@ -53,8 +53,8 @@ namespace Onyx.Windows.Rendering
 		public IClipper CreateClipper(ReadOnlySpan<Vector2d> convexPolygon)
 			=> new SkiaClipper(convexPolygon);
 
-		public IFont? CreateFont(FontInfo fontInfo, bool exactMatchOnly)
-			=> throw new NotImplementedException();
+		public IFont? CreateFont(FontInfo fontInfo, bool exactMatchOnly = false)
+			=> SkiaFont.Create(fontInfo, exactMatchOnly);
 
 		public IImage? CreateImage(string url)
 			=> throw new NotImplementedException();
@@ -99,7 +99,15 @@ namespace Onyx.Windows.Rendering
 
 		public void DrawText(Vector2d topLeftCorner, IFont font, ReadOnlySpan<char> text, IBrush brush)
 		{
-			throw new NotImplementedException();
+			if (font is not SkiaFont skiaFont)
+				throw new NotSupportedException("This method requires a SkiaFont.");
+			if (brush is not SkiaBrush skiaBrush)
+				throw new NotSupportedException("This method requires a SkiaBrush.");
+
+			skiaBrush.Apply(_paint);
+
+			_canvas.DrawText(SKTextBlob.Create(text, skiaFont.Font),
+				(float)topLeftCorner.X, (float)topLeftCorner.Y, _paint);
 		}
 
 		public void End()

@@ -10,6 +10,6 @@ namespace Onyx.Rendering
 		IBrush CreateRadialGradientBrush(RadialGradient radialGradient);
 		IImage? CreateImage(string url);
 		IClipper CreateClipper(ReadOnlySpan<Vector2d> convexPolygon);
-		IFont? CreateFont(FontInfo fontInfo, bool exactMatchOnly);
+		IFont? CreateFont(FontInfo fontInfo, bool exactMatchOnly = false);
 	}
 }

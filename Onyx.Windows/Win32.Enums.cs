@@ -1,4 +1,3 @@
-
 using Onyx.Css.Types;
 using static System.Net.Mime.MediaTypeNames;
 using System.Buffers.Text;
@@ -8,7 +7,7 @@ using System;
 
 namespace Onyx.Windows
 {
-	internal static partial class Win32
+	public static partial class Win32
 	{
 		public const ushort WM_NULL = 0x0000;
 		public const ushort WM_CREATE = 0x0001;

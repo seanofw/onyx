@@ -1,10 +1,8 @@
-using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
-using SkiaSharp;
 
 namespace Onyx.Windows
 {
-	internal static partial class Win32
+	public static partial class Win32
 	{
 		[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
 		public static extern IntPtr CreateWindowEx(uint dwExStyle,
@@ -62,6 +60,9 @@ namespace Onyx.Windows
 
 		[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
 		public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+		[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+		public static extern bool SetFocus(IntPtr hWnd);
 
 		[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
 		public static extern IntPtr BeginPaint(IntPtr hwnd, ref PAINTSTRUCT lpPaint);

@@ -1,7 +1,5 @@
-using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using Onyx.Css.Types;
 using Onyx.Html.Dom;
 using Onyx.Rendering;
 using Onyx.Types;
@@ -16,6 +14,8 @@ namespace Onyx.Windows
 	/// </summary>
 	public class Window : IDisposable
 	{
+		#region Properties
+
 		/// <summary>
 		/// The Win32 handle for the window.  Read-only.
 		/// </summary>
@@ -109,16 +109,17 @@ namespace Onyx.Windows
 		private Rect2i _clientRect;
 
 		/// <summary>
-		/// Whether to show a titlebar on this window.
+		/// Whether this window has a titlebar at its top.  You can set this property to
+		/// change the window's style.
 		/// </summary>
-		public bool ShowTitlebar
+		public bool HasTitlebar
 		{
-			get => _showTitlebar;
+			get => _hasTitlebar;
 			set
 			{
-				if (_showTitlebar != value)
+				if (_hasTitlebar != value)
 				{
-					_showTitlebar = value;
+					_hasTitlebar = value;
 
 					uint style = Win32.GetWindowLong(Handle, Win32.GWL_STYLE);
 					if (Marshal.GetLastWin32Error() != 0)
@@ -136,23 +137,154 @@ namespace Onyx.Windows
 				}
 			}
 		}
-		private bool _showTitlebar = true;
+		private bool _hasTitlebar;
 
-		public bool CanMaximize { get; set; } = true;
+		/// <summary>
+		/// Whether this window can be maximized by the user.  You can set this property to
+		/// change the window's style.
+		/// </summary>
+		public bool CanMaximize
+		{
+			get => _canMaximize;
+			set
+			{
+				if (_canMaximize != value)
+				{
+					_canMaximize = value;
+					UpdateWindowStyle();
+				}
+			}
+		}
+		private bool _canMaximize;
 
-		public bool CanMinimize { get; set; } = true;
+		/// <summary>
+		/// Whether this window can be minimized by the user.  You can set this property to
+		/// change the window's style.
+		/// </summary>
+		public bool CanMinimize
+		{
+			get => _canMinimize;
+			set
+			{
+				if (_canMinimize != value)
+				{
+					_canMinimize = value;
+					UpdateWindowStyle();
+				}
+			}
+		}
+		private bool _canMinimize;
 
-		public bool CanResize { get; set; } = true;
+		/// <summary>
+		/// Whether this window can be resized by the user.  You can set this property to
+		/// change the window's style.
+		/// </summary>
+		public bool CanResize
+		{
+			get => _canResize;
+			set
+			{
+				if (_canResize != value)
+				{
+					_canResize = value;
+					UpdateWindowStyle();
+				}
+			}
+		}
+		private bool _canResize;
 
-		public bool HasBorder { get; set; } = true;
+		/// <summary>
+		/// Whether this window has a border.  You can set this property to
+		/// change the window's style.
+		/// </summary>
+		public bool HasBorder
+		{
+			get => _hasBorder;
+			set
+			{
+				if (_hasBorder != value)
+				{
+					_hasBorder = value;
+					UpdateWindowStyle();
+				}
+			}
+		}
+		private bool _hasBorder;
 
-		public bool AlwaysOnTop { get; set; }
+		/// <summary>
+		/// Whether this window is a "tool window" with a smaller titlebar.  You can set
+		/// this property to change the window's style.
+		/// </summary>
+		public bool IsToolWindow
+		{
+			get => _isToolWindow;
+			set
+			{
+				if (_isToolWindow != value)
+				{
+					_isToolWindow = value;
+					UpdateWindowStyle();
+				}
+			}
+		}
+		private bool _isToolWindow;
 
-		public bool IsMaximized { get; set; }
+		/// <summary>
+		/// Whether this window is on top of other windows.  You can set this property to
+		/// change the window's style.
+		/// </summary>
+		public bool AlwaysOnTop
+		{
+			get => _alwaysOnTop;
+			set
+			{
+				if (_alwaysOnTop != value)
+				{
+					_alwaysOnTop = value;
+					UpdateWindowStyle();
+				}
+			}
+		}
+		private bool _alwaysOnTop;
 
-		public bool IsMinimized { get; set; }
+		/// <summary>
+		/// Whether this window is maximized.  Read-only status information.
+		/// </summary>
+		public bool IsMaximized { get; private set; }
 
-		public bool IsVisible { get; }
+		/// <summary>
+		/// Whether this window is minimized.  Read-only status information.
+		/// </summary>
+		public bool IsMinimized { get; private set; }
+
+		/// <summary>
+		/// Whether this window is visible.  You can set this to change the visible state.
+		/// </summary>
+		public bool IsVisible
+		{
+			get => _isVisible;
+			set
+			{
+				if (_isVisible != value)
+				{
+					if (value) Show();
+					else Hide();
+				}
+			}
+		}
+		private bool _isVisible;
+
+		/// <summary>
+		/// Whether this window has the keyboard focus.
+		/// </summary>
+		public bool IsFocused => _isFocused;
+		private bool _isFocused;
+
+		/// <summary>
+		/// Whether this is a true child of another parent window.
+		/// </summary>
+		public bool IsChildWindow => _isChildWindow;
+		private readonly bool _isChildWindow;
 
 		/// <summary>
 		/// The minimum allowable size of this window.
@@ -164,6 +296,10 @@ namespace Onyx.Windows
 		/// </summary>
 		public Size2i MaxSize { get; set; } = new Size2i(int.MaxValue, int.MaxValue);
 
+		#endregion
+
+		#region Internal state
+
 		/// <summary>
 		/// The surface on which all content rendering takes place.
 		/// </summary>
@@ -174,33 +310,71 @@ namespace Onyx.Windows
 		private IntPtr _oldBitmap = IntPtr.Zero;
 		private SkiaRenderer? _renderer;
 
-		#region Events
+		#endregion
+
+		#region Externally-bindable events
 
 		public event EventHandler? DocumentChanged;
 		public event EventHandler? TitleChanged;
 		public event EventHandler? ShowTitlebarChanged;
+
 		public event EventHandler<RectChangingEventArgs>? RectChanging;
 		public event EventHandler<RectChangedEventArgs>? RectChanged;
 		public event EventHandler<RectChangedEventArgs>? Moved;
 		public event EventHandler<RectChangedEventArgs>? Sized;
-		public event EventHandler<CancelEventArgs>? CloseClicked;
 		public event EventHandler<DisposeEventArgs>? Disposing;
 		public event EventHandler<DisposeEventArgs>? Disposed;
+		public event EventHandler<bool>? FocusChanged;
+		public event EventHandler<bool>? VisibleChanged;
+
+		public event EventHandler<CancelEventArgs>? CloseClicked;
 
 		#endregion
 
-		[ThreadStatic]
-		private static readonly ConcurrentDictionary<IntPtr, Window> _windowLookup =
-			new ConcurrentDictionary<IntPtr, Window>();
+		#region Static data
 
 		private static uint _classAtom = uint.MaxValue;
 		private static object _classAtomLock = new object();
 
+		/// <summary>
+		/// The current window count (in this thread, not in total).
+		/// </summary>
+		public static int WindowCount => _windowCount;
 		[ThreadStatic]
 		private static int _windowCount;
 
 		private const string ClassName = "OnyxWindow";
 
+		#endregion
+
+		#region Window construction and disposal
+
+		/// <summary>
+		/// Construct a new Window.
+		/// </summary>
+		/// <param name="document">(optional) The document to use as the initial content of the window.</param>
+		/// <param name="title">(optional) The title to display in the window's titlebar.</param>
+		/// <param name="point">(optional) The top-left coordinate for the window.</param>
+		/// <param name="size">(optional) The size of the window.</param>
+		/// <param name="rect">(optional) The position and size of the window. If given, this overrides
+		/// the individual 'point' and 'size' arguments.</param>
+		/// <param name="minSize">(optional) The minimum allowed size of the window.</param>
+		/// <param name="maxSize">(optional) The maximum allowed size of the window.</param>
+		/// <param name="hasBorder">(optional) Whether the window has a border around it of at least one pixel.</param>
+		/// <param name="hasTitlebar">(optional) Whether to display a titlebar on the window.</param>
+		/// <param name="canMaximize">(optional) Whether the window has a button that allows it to be maximized.</param>
+		/// <param name="canMinimize">(optional) Whether the window has a button that allows it to be minimized.</param>
+		/// <param name="canResize">(optional) Whether the window can be resized by the user.</param>
+		/// <param name="alwaysOnTop">(optional) Whether the window is "always on top" of other windows.</param>
+		/// <param name="isToolWindow">(optional) Whether this uses "tool window" styles.</param>
+		/// <param name="parentHwnd">(optional) Another HWND that is the parent of this window (as
+		/// a floating or contained child window).</param>
+		/// <param name="parentWindow">(optional) Another Window that is the parent of this window
+		/// (as a floating or contained child window).</param>
+		/// <param name="isChildWindow">(optional) Whether the parent window acts as just an owner
+		/// window of this where this is a floating window or popup, or whether the parent is a true
+		/// parent that contains this window fully inside it.</param>
+		/// <exception cref="Win32Exception">Thrown if the window cannot be created.</exception>
 		public Window(Document? document = null,
 			string? title = null,
 			Vector2i? point = null,
@@ -208,14 +382,16 @@ namespace Onyx.Windows
 			Rect2i? rect = null,
 			Size2i? minSize = null,
 			Size2i? maxSize = null,
-			bool showTitlebar = true,
-			bool canMaximize = true,
-			bool canMinimize = true,
-			bool canResize = true,
 			bool hasBorder = true,
-			bool alwaysOnTop = true,
-			bool isMaximized = false,
-			bool isMinimized = false)
+			bool hasTitlebar = true,
+			bool canResize = true,
+			bool canMinimize = true,
+			bool canMaximize = true,
+			bool isToolWindow = false,
+			bool alwaysOnTop = false,
+			IntPtr parentHwnd = default,
+			Window? parentWindow = null,
+			bool isChildWindow = false)
 		{
 			Rect2i r;
 			if (rect.HasValue)
@@ -233,29 +409,31 @@ namespace Onyx.Windows
 			_title = title;
 			_document = document;
 			_rect = r;
-			_showTitlebar = showTitlebar;
+			_isChildWindow = isChildWindow;
+
+			_hasTitlebar = hasTitlebar;
+			_hasBorder = hasBorder;
+			_canResize = canResize;
+			_canMinimize = canMinimize;
+			_canMaximize = canMaximize;
+			_isToolWindow = isToolWindow;
+			_alwaysOnTop = alwaysOnTop;
 
 			MinSize = minSize ?? MinSize;
 			MaxSize = maxSize ?? MaxSize;
-
-			//_canMaximize = canMaximize;
-			//_canMinimize = canMinimize;
-			//_canResize = canResize;
-			//_alwaysOnTop = alwaysOnTop;
-			//_isMaximized = isMaximized;
-			//_isMinimized = isMinimized;
 
 			uint atom = GetWindowClassAtom();
 
 			_gcHandle = GCHandle.Alloc(this);
 
-			Handle = Win32.CreateWindowEx(0, ClassName, title ?? string.Empty, Win32.WS_OVERLAPPEDWINDOW,
-				r.X, r.Y, r.Width, r.Height, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero,
+			(uint style, uint exStyle) = CalculateWindowStyle();
+
+			Handle = Win32.CreateWindowEx(exStyle,
+				ClassName, title ?? string.Empty, style,
+				r.X, r.Y, r.Width, r.Height, parentWindow?.Handle ?? parentHwnd, IntPtr.Zero, IntPtr.Zero,
 				GCHandle.ToIntPtr(_gcHandle));
 			if (Marshal.GetLastWin32Error() != 0)
 				throw new Win32Exception();
-
-			_windowLookup[Handle] = this;
 		}
 
 		~Window()
@@ -285,6 +463,63 @@ namespace Onyx.Windows
 			OnDisposed(isDisposing);
 		}
 
+		#endregion
+
+		#region Window-style calculation
+
+		/// <summary>
+		/// Update Windows's understanding of the style based on our internal style flags.
+		/// </summary>
+		private void UpdateWindowStyle()
+		{
+			(uint style, uint exStyle) = CalculateWindowStyle();
+
+			uint oldStyle = Win32.GetWindowLong(Handle, Win32.GWL_STYLE);
+			if (style != oldStyle)
+				Win32.SetWindowLong(Handle, Win32.GWL_STYLE, style);
+
+			uint oldExStyle = Win32.GetWindowLong(Handle, Win32.GWL_EXSTYLE);
+			if (exStyle != oldExStyle)
+				Win32.SetWindowLong(Handle, Win32.GWL_EXSTYLE, exStyle);
+		}
+
+		/// <summary>
+		/// Calculate the correct window style based on our internal style flags.
+		/// </summary>
+		/// <returns>The correct window style and extended style for this window.</returns>
+		protected virtual (uint Style, uint ExStyle) CalculateWindowStyle()
+		{
+			if (_isChildWindow)
+				return (Win32.WS_CHILD, 0);
+
+			uint style =
+				  (_hasBorder || _hasTitlebar ? Win32.WS_OVERLAPPED : Win32.WS_POPUP)
+				| (_hasTitlebar ? Win32.WS_CAPTION : 0)
+				| (_hasTitlebar ? Win32.WS_SYSMENU : 0)
+				| (_hasBorder && _canResize ? Win32.WS_THICKFRAME : 0)
+				| (_hasTitlebar && _canMinimize? Win32.WS_MINIMIZEBOX : 0)
+				| (_hasTitlebar && _canMaximize ? Win32.WS_MAXIMIZEBOX : 0);
+
+			uint exStyle =
+				  (_hasBorder || _hasTitlebar ? Win32.WS_EX_WINDOWEDGE : 0)
+				| (_hasBorder && _canResize ? Win32.WS_EX_CLIENTEDGE : 0)
+				| (_isToolWindow ? Win32.WS_EX_TOOLWINDOW : 0)
+				| (_alwaysOnTop ? Win32.WS_EX_TOPMOST : 0);
+
+			return (style, exStyle);
+		}
+
+		#endregion
+
+		#region Show, hide, activate, focus, etc.
+
+		public void Activate()
+		{
+			Win32.ShowWindow(Handle, Win32.SW_SHOW);
+			if (Marshal.GetLastWin32Error() != 0)
+				throw new Win32Exception();
+		}
+
 		public void Show(bool activate = true)
 		{
 			Win32.ShowWindow(Handle, activate ? Win32.SW_SHOW : Win32.SW_SHOWNA);
@@ -299,52 +534,37 @@ namespace Onyx.Windows
 				throw new Win32Exception();
 		}
 
-		#region Event methods
-
-		protected virtual void OnDocumentChanged()
-			=> DocumentChanged?.Invoke(this, EventArgs.Empty);
-
-		protected virtual void OnTitleChanged()
-			=> TitleChanged?.Invoke(this, EventArgs.Empty);
-
-		protected virtual void OnShowTitlebarChanged()
-			=> ShowTitlebarChanged?.Invoke(this, EventArgs.Empty);
-
-		protected virtual void OnRectChanged(Rect2i oldRect, Rect2i newRect)
-			=> RectChanged?.Invoke(this, new RectChangedEventArgs(oldRect, newRect));
-
-		protected virtual Rect2i? OnRectChanging(Rect2i oldRect, Rect2i newRect)
+		public void Maximize()
 		{
-			Rect2i? constrainedRect = ConstrainRect(oldRect, newRect);
-			newRect = constrainedRect ?? newRect;
-
-			RectChangingEventArgs eventArgs = new RectChangingEventArgs(oldRect, newRect);
-			RectChanging?.Invoke(this, eventArgs);
-			return eventArgs.Cancel ? null : newRect;
+			Win32.ShowWindow(Handle, Win32.SW_SHOWMAXIMIZED);
+			if (Marshal.GetLastWin32Error() != 0)
+				throw new Win32Exception();
 		}
 
-		protected virtual void OnMoved(Rect2i oldRect, Rect2i newRect)
-			=> Moved?.Invoke(this, new RectChangedEventArgs(oldRect, newRect));
-
-		protected virtual void OnSized(Rect2i oldRect, Rect2i newRect)
-			=> Sized?.Invoke(this, new RectChangedEventArgs(oldRect, newRect));
-
-		protected virtual void OnCloseClicked()
+		public void Minimize()
 		{
-			CancelEventArgs cancelEventArgs = new CancelEventArgs();
-			CloseClicked?.Invoke(this, cancelEventArgs);
-
-			if (!cancelEventArgs.Cancel)
-				Dispose(true);
+			Win32.ShowWindow(Handle, Win32.SW_SHOWMINIMIZED);
+			if (Marshal.GetLastWin32Error() != 0)
+				throw new Win32Exception();
 		}
 
-		protected virtual void OnDisposing(bool isDisposing)
-			=> Disposing?.Invoke(this, new DisposeEventArgs(isDisposing));
+		public void Restore()
+		{
+			Win32.ShowWindow(Handle, Win32.SW_SHOWNORMAL);
+			if (Marshal.GetLastWin32Error() != 0)
+				throw new Win32Exception();
+		}
 
-		protected virtual void OnDisposed(bool isDisposing)
-			=> Disposed?.Invoke(this, new DisposeEventArgs(isDisposing));
+		public void Focus()
+		{
+			Win32.SetFocus(Handle);
+			if (Marshal.GetLastWin32Error() != 0)
+				throw new Win32Exception();
+		}
 
 		#endregion
+
+		#region Window-size constraints
 
 		/// <summary>
 		/// Given an old rect and a new rect, constrain the new rect to the defined
@@ -451,6 +671,14 @@ namespace Onyx.Windows
 			}
 		}
 
+		#endregion
+
+		#region WindowProc core
+
+		/// <summary>
+		/// Retrieve the window-class atom for Onyx Win32 Window objects, creating the atom if
+		/// it hasn't been created yet.
+		/// </summary>
 		private static uint GetWindowClassAtom()
 		{
 			if (_classAtom == uint.MaxValue)
@@ -463,7 +691,7 @@ namespace Onyx.Windows
 
 						wndClass.cbSize = (uint)Marshal.SizeOf(wndClass);
 						wndClass.style = 0;
-						wndClass.lpfnWndProc = WindowProc;
+						wndClass.lpfnWndProc = WindowProcInternal;
 						wndClass.cbClsExtra = 0;
 						wndClass.cbWndExtra = Marshal.SizeOf<IntPtr>();
 						wndClass.hInstance = Marshal.GetHINSTANCE(typeof(Window).Module);
@@ -486,116 +714,385 @@ namespace Onyx.Windows
 			return _classAtom;
 		}
 
-		private static IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
+		/// <summary>
+		/// All window messages arrive here first.  The only responsibility this method
+		/// has is to find the correct Window instance and then propagate the messages
+		/// to it (and handle necessary cleanup when the Window instance is destroyed).
+		/// Everything else is done by the (overridable) WindowProc() method.
+		/// </summary>
+		private static unsafe IntPtr WindowProcInternal(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
 		{
-			IntPtr gcHandleValue = Win32.GetWindowLongPtr(hWnd, 0);
+			// WM_NCCREATE is special, as it's the first real message that the window gets.
+			// We use it to set up the GCHandle, which is needed to be able to access the
+			// Window object itself.
+			IntPtr gcHandleValue;
+			if (msg == Win32.WM_NCCREATE)
+			{
+				Win32.CREATESTRUCT* lpCreateStruct = (Win32.CREATESTRUCT*)lParam;
+				gcHandleValue = lpCreateStruct->lpCreateParams;
+
+				Win32.SetWindowLongPtr(hWnd, 0, gcHandleValue);
+				Interlocked.Increment(ref _windowCount);
+			}
+			else
+			{
+				gcHandleValue = Win32.GetWindowLongPtr(hWnd, 0);
+			}
+
+			// Retrieve the Window object for this window.
 			Window? window = gcHandleValue != IntPtr.Zero
 				? GCHandle.FromIntPtr(gcHandleValue).Target as Window
 				: null;
 
+			// WM_NCDESTROY is just as special, and needs to perform critical cleanup
+			// on this window before it goes away.  It's implemented here so that even
+			// if someone overrides WindowProc() and fails to call the base, we won't
+			// leak resources.
+			if (msg == Win32.WM_NCDESTROY && window != null)
+			{
+				window.FreeSurface();
+				window.FreeGdiBackBuffer();
+
+				window._gcHandle.Free();
+				window._gcHandle = default;
+				Win32.SetWindowLongPtr(hWnd, 0, IntPtr.Zero);
+
+				Interlocked.Decrement(ref _windowCount);
+			}
+
+			return window?.WindowProc(hWnd, msg, wParam, lParam)
+				?? Win32.DefWindowProc(hWnd, msg, wParam, lParam);
+		}
+
+		/// <summary>
+		/// The Win32 window procedure for this window; all window messages are directed
+		/// through this after and including WM_NCCREATE.  This method can be overridden,
+		/// but you must always call the base method:  Failure to invoke the base *will*
+		/// likely result in unpredictable window behavior.
+		/// </summary>
+		/// <param name="hWnd">The window handle for this window.</param>
+		/// <param name="msg">The message.</param>
+		/// <param name="wParam">The first message parameter.</param>
+		/// <param name="lParam">The second message parameter.</param>
+		/// <returns>The message response.</returns>
+		protected virtual unsafe IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
+		{
 			switch (msg)
 			{
 				case Win32.WM_NCCREATE:
-					unsafe
-					{
-						Win32.CREATESTRUCT* lpCreateStruct = (Win32.CREATESTRUCT*)lParam;
-						Win32.SetWindowLongPtr(hWnd, 0, lpCreateStruct->lpCreateParams);
-						Interlocked.Increment(ref _windowCount);
-					}
+					OnWin32_NcCreate(ref *(Win32.CREATESTRUCT*)lParam);
 					break;
 
 				case Win32.WM_NCDESTROY:
-					if (window != null)
-					{
-						window.FreeSurface();
-						window.FreeGdiBackBuffer();
+					OnWin32_NcDestroy();
+					break;
 
-						window._gcHandle.Free();
-						window._gcHandle = default;
-						Win32.SetWindowLongPtr(hWnd, 0, IntPtr.Zero);
+				case Win32.WM_CREATE:
+					OnWin32_Create(ref *(Win32.CREATESTRUCT*)lParam);
+					break;
 
-						if (Interlocked.Decrement(ref _windowCount) == 0)
-						{
-							WindowsMessageQueue.Quit();
-						}
-					}
+				case Win32.WM_DESTROY:
+					OnWin32_Destroy();
+					break;
+
+				case Win32.WM_SHOWWINDOW:
+					OnWin32_ShowWindow(wParam != 0, (int)lParam);
+					break;
+
+				case Win32.WM_ACTIVATE:
+					OnWin32_Activate((int)wParam, lParam);
 					break;
 
 				case Win32.WM_WINDOWPOSCHANGING:
-					if (window != null)
-					{
-						unsafe
-						{
-							Win32.WINDOWPOS* lpWindowPos = (Win32.WINDOWPOS*)lParam;
-							Rect2i oldRect = window._rect;
-							Rect2i newRect = new Rect2i(lpWindowPos->x, lpWindowPos->y, lpWindowPos->cx, lpWindowPos->cy);
-							if (oldRect != newRect)
-							{
-								Rect2i? modifiedRect;
-								if (!(modifiedRect = window.OnRectChanging(oldRect, newRect)).HasValue)
-								{
-									lpWindowPos->flags |= Win32.SWP_NOACTIVATE
-										| Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOREPOSITION
-										| Win32.SWP_NOOWNERZORDER | Win32.SWP_NOZORDER;
-								}
-								else
-								{
-									lpWindowPos->x = modifiedRect.Value.X;
-									lpWindowPos->y = modifiedRect.Value.Y;
-									lpWindowPos->cx = modifiedRect.Value.Width;
-									lpWindowPos->cy = modifiedRect.Value.Height;
-								}
-							}
-						}
-					}
-					return 0;
+					return OnWin32_WindowPosChanging(ref *(Win32.WINDOWPOS*)lParam);
 
 				case Win32.WM_WINDOWPOSCHANGED:
-					if (window != null)
-					{
-						unsafe
-						{
-							Win32.WINDOWPOS* lpWindowPos = (Win32.WINDOWPOS*)lParam;
-							Rect2i oldRect = window._rect;
-							Rect2i newRect = new Rect2i(lpWindowPos->x, lpWindowPos->y, lpWindowPos->cx, lpWindowPos->cy);
-							if (oldRect != newRect)
-							{
-								window._rect = newRect;
-								Win32.RECT clientRect;
-								Win32.GetClientRect(hWnd, out clientRect);
-								window._clientRect = new Rect2i(clientRect.Left, clientRect.Top,
-									clientRect.Right - clientRect.Left, clientRect.Bottom - clientRect.Top);
-								window.OnRectChanged(oldRect, newRect);
-							}
-							if (oldRect.Point != newRect.Point)
-								window.OnMoved(oldRect, newRect);
-							if (oldRect.Size != newRect.Size)
-								window.OnSized(oldRect, newRect);
-						}
-					}
-					return 0;
+					return OnWin32_WindowPosChanged(ref *(Win32.WINDOWPOS*)lParam);
 
 				case Win32.WM_PAINT:
-					Win32.PAINTSTRUCT paintStruct = default;
-					IntPtr hdc = Win32.BeginPaint(hWnd, ref paintStruct);
-
-					if (window != null)
-					{
-						window.Render(hdc, new Rect2i(paintStruct.rcPaint.Left, paintStruct.rcPaint.Top,
-							paintStruct.rcPaint.Right - paintStruct.rcPaint.Left,
-							paintStruct.rcPaint.Bottom - paintStruct.rcPaint.Top));
-					}
-
-					Win32.EndPaint(hWnd, ref paintStruct);
-					return 0;
+					return OnWin32_Paint();
 
 				case Win32.WM_CLOSE:
-					window?.OnCloseClicked();
-					return 0;
+					OnClose();
+					return IntPtr.Zero;
+
+				case Win32.WM_MOUSEMOVE:
+					OnMouseMove((ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+
+				case Win32.WM_LBUTTONDOWN:
+					OnMouseButton(MouseButton.Left, MouseButtonAction.Press, (ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+				case Win32.WM_LBUTTONUP:
+					OnMouseButton(MouseButton.Left, MouseButtonAction.Release, (ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+				case Win32.WM_LBUTTONDBLCLK:
+					OnMouseButton(MouseButton.Left, MouseButtonAction.DoubleClick, (ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+
+				case Win32.WM_RBUTTONDOWN:
+					OnMouseButton(MouseButton.Right, MouseButtonAction.Press, (ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+				case Win32.WM_RBUTTONUP:
+					OnMouseButton(MouseButton.Right, MouseButtonAction.Release, (ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+				case Win32.WM_RBUTTONDBLCLK:
+					OnMouseButton(MouseButton.Right, MouseButtonAction.DoubleClick, (ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+
+				case Win32.WM_MBUTTONDOWN:
+					OnMouseButton(MouseButton.Middle, MouseButtonAction.Press, (ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+				case Win32.WM_MBUTTONUP:
+					OnMouseButton(MouseButton.Middle, MouseButtonAction.Release, (ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+				case Win32.WM_MBUTTONDBLCLK:
+					OnMouseButton(MouseButton.Middle, MouseButtonAction.DoubleClick, (ModifierKeys)wParam, LParamToVector2i(lParam));
+					return IntPtr.Zero;
+
+				case Win32.WM_XBUTTONDOWN:
+					OnMouseButton((MouseButton)((int)MouseButton.X1 + ((wParam >> 16) & 0xFFFF)),
+						MouseButtonAction.Press, (ModifierKeys)(wParam & 0xFFFF), LParamToVector2i(lParam));
+					return IntPtr.Zero;
+				case Win32.WM_XBUTTONUP:
+					OnMouseButton((MouseButton)((int)MouseButton.X1 + ((wParam >> 16) & 0xFFFF)),
+						MouseButtonAction.Release, (ModifierKeys)(wParam & 0xFFFF), LParamToVector2i(lParam));
+					return IntPtr.Zero;
+				case Win32.WM_XBUTTONDBLCLK:
+					OnMouseButton((MouseButton)((int)MouseButton.X1 + ((wParam >> 16) & 0xFFFF)),
+						MouseButtonAction.DoubleClick, (ModifierKeys)(wParam & 0xFFFF), LParamToVector2i(lParam));
+					return IntPtr.Zero;
+
+				case Win32.WM_KEYDOWN:
+					OnKey((int)wParam, (lParam & (1 << 30)) != 0 ? KeyAction.Repeat : KeyAction.Press);
+					return IntPtr.Zero;
+				case Win32.WM_KEYUP:
+					OnKey((int)wParam, KeyAction.Release);
+					return IntPtr.Zero;
+				case Win32.WM_CHAR:
+					OnChar((char)wParam);
+					return IntPtr.Zero;
+
+				case Win32.WM_SETFOCUS:
+					OnWin32_Focus(true);
+					return IntPtr.Zero;
+				case Win32.WM_KILLFOCUS:
+					OnWin32_Focus(false);
+					return IntPtr.Zero;
 			}
 
 			return Win32.DefWindowProc(hWnd, msg, wParam, lParam);
 		}
+
+		/// <summary>
+		/// A tiny helper that turns mouse LPARAM values into Vector2i structs.
+		/// </summary>
+		private static Vector2i LParamToVector2i(IntPtr lParam)
+			=> new Vector2i((short)(lParam & 0xFFFF), (short)((lParam >> 16) & 0xFFFF));
+
+		#endregion
+
+		#region Win32 window messages
+		
+		// These are Windows-specific handlers for Windows-specific behavior.  We don't
+		// attempt to make them portable, and a lot of them take WPARAM and LPARAM values
+		// directly, or something that's very thinly-disguised WPARAM and LPARAM values.
+		//
+		// Code that uses these handlers is generally *not* portable to other UI platforms,
+		// and overriding these methods may produce unexpected behavior if the base
+		// method is not invoked.
+
+		protected virtual void OnWin32_Focus(bool focus)
+		{
+			if (_isFocused != focus)
+			{
+				_isFocused = focus;
+				FocusChanged?.Invoke(this, focus);
+			}
+		}
+
+		protected virtual void OnWin32_Activate(int activated, IntPtr windowHandle)
+		{
+		}
+
+		protected unsafe virtual void OnWin32_ShowWindow(bool shown, int status)
+		{
+			IsMinimized = (status == Win32.SW_SHOWMINIMIZED
+				|| status == Win32.SW_SHOWMINNOACTIVE
+				|| status == Win32.SW_MINIMIZE
+				|| status == Win32.SW_FORCEMINIMIZE);
+
+			IsMaximized = (status == Win32.SW_SHOWMAXIMIZED);
+
+			if (_isVisible != shown)
+			{
+				_isVisible = shown;
+				VisibleChanged?.Invoke(this, shown);
+			}
+		}
+
+		protected unsafe virtual void OnWin32_NcCreate(ref Win32.CREATESTRUCT createStruct)
+		{
+		}
+
+		protected unsafe virtual void OnWin32_NcDestroy()
+		{
+			if (_windowCount == 0)
+				WindowsMessageQueue.Quit();
+		}
+
+		protected unsafe virtual void OnWin32_Create(ref Win32.CREATESTRUCT createStruct)
+		{
+		}
+
+		protected unsafe virtual void OnWin32_Destroy()
+		{
+		}
+
+		protected unsafe virtual IntPtr OnWin32_WindowPosChanged(ref Win32.WINDOWPOS lpWindowPos)
+		{
+			Rect2i oldRect = _rect;
+			Rect2i newRect = new Rect2i(lpWindowPos.x, lpWindowPos.y, lpWindowPos.cx, lpWindowPos.cy);
+
+			if (oldRect != newRect)
+			{
+				_rect = newRect;
+				Win32.RECT clientRect;
+				Win32.GetClientRect(Handle, out clientRect);
+				_clientRect = new Rect2i(clientRect.Left, clientRect.Top,
+					clientRect.Right - clientRect.Left, clientRect.Bottom - clientRect.Top);
+				OnRectChanged(oldRect, newRect);
+			}
+
+			if (oldRect.Point != newRect.Point)
+				OnMoved(oldRect, newRect);
+
+			if (oldRect.Size != newRect.Size)
+				OnSized(oldRect, newRect);
+
+			return IntPtr.Zero;
+		}
+
+		protected unsafe virtual IntPtr OnWin32_WindowPosChanging(ref Win32.WINDOWPOS windowPos)
+		{
+			Rect2i oldRect = _rect;
+			Rect2i newRect = new Rect2i(windowPos.x, windowPos.y, windowPos.cx, windowPos.cy);
+
+			if (oldRect != newRect)
+			{
+				Rect2i? modifiedRect;
+				if (!(modifiedRect = OnRectChanging(oldRect, newRect)).HasValue)
+				{
+					windowPos.flags |= Win32.SWP_NOACTIVATE
+						| Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOREPOSITION
+						| Win32.SWP_NOOWNERZORDER | Win32.SWP_NOZORDER;
+				}
+				else
+				{
+					windowPos.x = modifiedRect.Value.X;
+					windowPos.y = modifiedRect.Value.Y;
+					windowPos.cx = modifiedRect.Value.Width;
+					windowPos.cy = modifiedRect.Value.Height;
+				}
+			}
+
+			return IntPtr.Zero;
+		}
+
+		protected unsafe virtual IntPtr OnWin32_Paint()
+		{
+			Win32.PAINTSTRUCT paintStruct = default;
+
+			IntPtr hdc = Win32.BeginPaint(Handle, ref paintStruct);
+
+			Render(hdc, new Rect2i(paintStruct.rcPaint.Left, paintStruct.rcPaint.Top,
+				paintStruct.rcPaint.Right - paintStruct.rcPaint.Left,
+				paintStruct.rcPaint.Bottom - paintStruct.rcPaint.Top));
+
+			Win32.EndPaint(Handle, ref paintStruct);
+
+			return IntPtr.Zero;
+		}
+
+		#endregion
+
+		#region Mid-level window messages
+
+		// These message handlers are still fairly Win32-oriented, but they're still
+		// designed to be more general and reusable than the true OnWin32_*() handlers.
+		//
+		// Code written that uses these *may* be somewhat portable to other UI platforms,
+		// with some mild massaging.
+
+		protected virtual void OnClose()
+		{
+			CancelEventArgs cancelEventArgs = new CancelEventArgs();
+			CloseClicked?.Invoke(this, cancelEventArgs);
+
+			if (!cancelEventArgs.Cancel)
+				Dispose(true);
+		}
+
+		protected virtual void OnChar(char ch)
+		{
+		}
+
+		protected virtual void OnKey(int virtualKey, KeyAction action)
+		{
+		}
+
+		protected virtual void OnMouseButton(MouseButton button, MouseButtonAction action,
+			ModifierKeys keys, Vector2i mousePos)
+		{
+		}
+
+		protected virtual void OnMouseMove(ModifierKeys keys, Vector2i mousePos)
+		{
+		}
+
+		#endregion
+
+		#region High-level messages
+
+		// These messages are generally portable to all Window-like platform implementations, and
+		// even to many plaform implementations that are not (like full-screen kiosk implementations).
+		// These are fairly abstract events and should be usable regardless of platform.
+
+		protected virtual void OnDocumentChanged()
+			=> DocumentChanged?.Invoke(this, EventArgs.Empty);
+
+		protected virtual void OnTitleChanged()
+			=> TitleChanged?.Invoke(this, EventArgs.Empty);
+
+		protected virtual void OnShowTitlebarChanged()
+			=> ShowTitlebarChanged?.Invoke(this, EventArgs.Empty);
+
+		protected virtual void OnRectChanged(Rect2i oldRect, Rect2i newRect)
+			=> RectChanged?.Invoke(this, new RectChangedEventArgs(oldRect, newRect));
+
+		protected virtual Rect2i? OnRectChanging(Rect2i oldRect, Rect2i newRect)
+		{
+			Rect2i? constrainedRect = ConstrainRect(oldRect, newRect);
+			newRect = constrainedRect ?? newRect;
+
+			RectChangingEventArgs eventArgs = new RectChangingEventArgs(oldRect, newRect);
+			RectChanging?.Invoke(this, eventArgs);
+			return eventArgs.Cancel ? null : newRect;
+		}
+
+		protected virtual void OnMoved(Rect2i oldRect, Rect2i newRect)
+			=> Moved?.Invoke(this, new RectChangedEventArgs(oldRect, newRect));
+
+		protected virtual void OnSized(Rect2i oldRect, Rect2i newRect)
+			=> Sized?.Invoke(this, new RectChangedEventArgs(oldRect, newRect));
+
+		protected virtual void OnDisposing(bool isDisposing)
+			=> Disposing?.Invoke(this, new DisposeEventArgs(isDisposing));
+
+		protected virtual void OnDisposed(bool isDisposing)
+			=> Disposed?.Invoke(this, new DisposeEventArgs(isDisposing));
+
+		#endregion
 
 		#region Rendering logic
 
@@ -611,9 +1108,19 @@ namespace Onyx.Windows
 
 			IBrush redBrush = renderables.CreateSolidBrush(Color32.Red);
 			IBrush blueBrush = renderables.CreateSolidBrush(Color32.Blue);
+			IBrush blackBrush = renderables.CreateSolidBrush(Color32.Black);
+			IFont? font = renderables.CreateFont(new FontInfo("Segoe UI", 14), false);
 
 			renderer.FillRect(new Rect2d(10, 10, 200, 100), redBrush);
 			renderer.FillRect(new Rect2d(100, 100, 200, 100), blueBrush);
+
+			Vector2d lineStart = new Vector2d(10, 250);
+			renderer.DrawText(lineStart, font!, "Hello, World.", blackBrush);
+			lineStart += new Vector2d(0, font!.FontMetrics.LineHeight);
+			renderer.DrawText(lineStart, font!, "Goodbye, World.", blackBrush);
+
+			if (font is IDisposable disposableFont)
+				disposableFont.Dispose();
 
 			//---- End Document rendering.
 
@@ -642,7 +1149,8 @@ namespace Onyx.Windows
 
 			_surface = SKSurface.Create(
 				new SKImageInfo(size.Width, size.Height, SKColorType.Bgra8888, SKAlphaType.Opaque),
-				pixelBuffer, size.Width * 4);
+				pixelBuffer, size.Width * 4,
+				new SKSurfaceProperties(SKPixelGeometry.RgbHorizontal));
 		}
 
 		private void FreeSurface()

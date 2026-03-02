@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Onyx.Windows
 {
-	internal static partial class Win32
+	public static partial class Win32
 	{
 		[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 		public struct MSG
