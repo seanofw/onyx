@@ -62,6 +62,10 @@ namespace Onyx.Types
 			=> new Vector2i(v.X / scale, v.Y / scale);
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public int Dot(Vector2i other)
+			=> X * other.X + Y * other.Y;
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool operator ==(Vector2i a, Vector2i b)
 			=> a.X == b.X && a.Y == b.Y;
 

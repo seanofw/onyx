@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using Onyx.Css.Types;
 using Onyx.Html.Dom;
 using Onyx.Rendering;
 using Onyx.Types;
@@ -1106,18 +1107,38 @@ namespace Onyx.Windows
 
 			renderer.Clear(DefaultBackgroundColor);
 
-			IBrush redBrush = renderables.CreateSolidBrush(Color32.Red);
-			IBrush blueBrush = renderables.CreateSolidBrush(Color32.Blue);
-			IBrush blackBrush = renderables.CreateSolidBrush(Color32.Black);
 			IFont? font = renderables.CreateFont(new FontInfo("Segoe UI", 14), false);
+			IBrush gradientBrush = new SkiaLinearGradientBrush(new LinearGradient
+			{
+				UsesTo = true,
+				SideOrCorner = SideOrCorner.TopRight,
+				ColorStops =
+				[
+					new ColorStop
+					{
+						Measure = new Measure(Units.Percent, 49),
+						Color = Color32.Red,
+					},
+					new ColorStop
+					{
+						Measure = new Measure(Units.Percent, 51),
+						Color = Color32.Green,
+					}
+				]
+			});
 
-			renderer.FillRect(new Rect2d(10, 10, 200, 100), redBrush);
-			renderer.FillRect(new Rect2d(100, 100, 200, 100), blueBrush);
+			DrawStyle style = DrawStyle.Default.WithFont(font!);
+
+			renderer.FillRect(new Rect2d(10, 10, 200, 100),
+				style.WithBrush(gradientBrush, new Rect2d(10, 10, 200, 100)));
+			renderer.FillRect(new Rect2d(100, 100, 200, 100), style.WithColor(Color32.Blue));
+
+			DrawStyle blackStyle = style.WithColor(Color32.Black);
 
 			Vector2d lineStart = new Vector2d(10, 250);
-			renderer.DrawText(lineStart, font!, "Hello, World.", blackBrush);
+			renderer.DrawText(lineStart, "Hello, World.", blackStyle);
 			lineStart += new Vector2d(0, font!.FontMetrics.LineHeight);
-			renderer.DrawText(lineStart, font!, "Goodbye, World.", blackBrush);
+			renderer.DrawText(lineStart, "Goodbye, World.", blackStyle);
 
 			if (font is IDisposable disposableFont)
 				disposableFont.Dispose();

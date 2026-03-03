@@ -7,16 +7,14 @@ namespace Onyx.Rendering
 		void Begin();	// Invoked before any drawing on a surface
 		void End();     // Invoked after all drawing on a surface is complete
 
-		IClipper? Clip { get; set; }
-		double Opacity { get; set; }
-		Matrix3d Transform { get; set; }
-
 		void Clear(Color32 color);
-		void DrawText(Vector2d topLeftCorner, IFont font, ReadOnlySpan<char> text, IBrush brush);
-		void FillRect(Rect2d rect, IBrush brush);
-		void DrawLines(ReadOnlySpan<Vector2d> points, bool closePolygon, IBrush brush,
-			double thickness, LineStyle lineStyle);
-		void FillPolygon(ReadOnlySpan<Vector2d> points, IBrush brush);
-		void DrawImage(IImage image, Rect2d sourceRect, Vector2d dest);
+
+		void FillRect(Rect2d rect, DrawStyle style);
+		void DrawLines(ReadOnlySpan<Vector2d> points, bool closePolygon, DrawStyle style);
+		void FillPolygon(ReadOnlySpan<Vector2d> points, DrawStyle style);
+		void DrawText(Vector2d topLeftCorner, ReadOnlySpan<char> text, DrawStyle style);
+		void DrawImage(IImage image, Rect2d sourceRect, Vector2d dest, DrawStyle style);
+		void FillRoundRect(Rect2d rect, CornerRadii radii, DrawStyle style);
+		void DrawRoundRect(Rect2d rect, CornerRadii radii, DrawStyle style);
 	}
 }

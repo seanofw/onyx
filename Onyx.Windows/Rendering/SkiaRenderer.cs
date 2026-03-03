@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Onyx.Css.Types;
 using Onyx.Rendering;
 using Onyx.Types;
@@ -5,44 +7,50 @@ using SkiaSharp;
 
 namespace Onyx.Windows.Rendering
 {
-	public class SkiaRenderer : IRenderer, IRenderables
+	public class SkiaRenderer : IRenderer, IRenderables, IDisposable
 	{
-		public IClipper? Clip { get; set; }
+		private DrawStyle _lastDrawStyle = DrawStyle.Default;
 
-		public double Opacity
-		{
-			get => _opacity;
-			set
-			{
-				if (_opacity != value)
-				{
-					_opacity = value;
-				}
-			}
-		}
-		private double _opacity = 1.0;
-
-		public Matrix3d Transform
-		{
-			get => _transform;
-			set
-			{
-				if (_transform != value)
-				{
-					_transform = value;
-					_canvas.SetMatrix(value.ToSKMatrix());
-				}
-			}
-		}
-		private Matrix3d _transform = Matrix3d.Identity;
-
-		private readonly SKCanvas _canvas;
+		private SKCanvas _canvas;
 		private SKPaint _paint;
+		private SKFont _defaultFont;
+		private SKRoundRect _roundRect;
+		private SKFont _currentFont;
 
 		public SkiaRenderer(SKCanvas canvas)
 		{
 			_canvas = canvas;
 			_paint = new SKPaint();
+			_currentFont = _defaultFont = new SKFont(SKTypeface.CreateDefault(), 12);
+			_roundRect = new SKRoundRect();
+		}
+
+		~SkiaRenderer()
+		{
+			Dispose(false);
+		}
+
+		public void Dispose()
+		{
+			Dispose(true);
+			GC.SuppressFinalize(this);
+		}
+
+		protected virtual void Dispose(bool isDisposing)
+		{
+			if (isDisposing)
+			{
+				_defaultFont?.Dispose();
+				_defaultFont = null!;
+
+				_roundRect?.Dispose();
+				_roundRect = null!;
+
+				_paint?.Dispose();
+				_paint = null!;
+			}
+
+			_canvas = null!;
 		}
 
 		public void Begin()
@@ -65,49 +73,35 @@ namespace Onyx.Windows.Rendering
 		public IBrush CreateRadialGradientBrush(RadialGradient radialGradient)
 			=> throw new NotImplementedException();
 
-		public IBrush CreateSolidBrush(Color32 color)
-			=> new SkiaSolidColorBrush(color);
-
 		public void Clear(Color32 color)
 		{
 			_canvas.Clear(color.ToSKColor());
 		}
 
-		public void DrawImage(IImage image, Rect2d sourceRect, Vector2d dest)
+		public void DrawImage(IImage image, Rect2d sourceRect, Vector2d dest, DrawStyle style)
 		{
 			throw new NotImplementedException();
 		}
 
-		public void DrawLines(ReadOnlySpan<Vector2d> points, bool closePolygon, IBrush brush,
-			double thickness, LineStyle lineStyle)
+		public void DrawLines(ReadOnlySpan<Vector2d> points, bool closePolygon, DrawStyle style)
 		{
-			if (brush is not SkiaBrush skiaBrush)
-				throw new NotSupportedException("This method requires a SkiaBrush.");
-
 			SKPoint[] skPoints = new SKPoint[points.Length];
 			for (int i = 0; i < skPoints.Length; i++)
 				skPoints[i] = points[i].ToSKPoint();
 
-			skiaBrush.Apply(_paint);
-			_paint.StrokeWidth = (float)thickness;
+			ApplyStyle(style);
+
 			_paint.Style = SKPaintStyle.Stroke;
-
 			_canvas.DrawPoints(closePolygon ? SKPointMode.Polygon : SKPointMode.Lines, skPoints, _paint);
-
 			_paint.Style = SKPaintStyle.Fill;
 		}
 
-		public void DrawText(Vector2d topLeftCorner, IFont font, ReadOnlySpan<char> text, IBrush brush)
+		public void DrawText(Vector2d topLeftCorner, ReadOnlySpan<char> text, DrawStyle style)
 		{
-			if (font is not SkiaFont skiaFont)
-				throw new NotSupportedException("This method requires a SkiaFont.");
-			if (brush is not SkiaBrush skiaBrush)
-				throw new NotSupportedException("This method requires a SkiaBrush.");
+			ApplyStyle(style);
 
-			skiaBrush.Apply(_paint);
-
-			_canvas.DrawText(SKTextBlob.Create(text, skiaFont.Font),
-				(float)topLeftCorner.X, (float)topLeftCorner.Y, _paint);
+			SKTextBlob? textBlob = SKTextBlob.Create(text, _currentFont);
+			_canvas.DrawText(textBlob, (float)topLeftCorner.X, (float)topLeftCorner.Y, _paint);
 		}
 
 		public void End()
@@ -115,10 +109,9 @@ namespace Onyx.Windows.Rendering
 			_canvas.Restore();
 		}
 
-		public void FillPolygon(ReadOnlySpan<Vector2d> points, IBrush brush)
+		public void FillPolygon(ReadOnlySpan<Vector2d> points, DrawStyle style)
 		{
-			if (brush is not SkiaBrush skiaBrush)
-				throw new NotSupportedException("This method requires a SkiaBrush.");
+			ApplyStyle(style);
 
 			SKPoint[] skPoints = new SKPoint[points.Length];
 			for (int i = 0; i < skPoints.Length; i++)
@@ -127,19 +120,100 @@ namespace Onyx.Windows.Rendering
 			using SKPath skPath = new SKPath();
 			skPath.AddPoly(skPoints);
 
-			skiaBrush.Apply(_paint);
 			_canvas.DrawPath(skPath, _paint);
 		}
 
-		public void FillRect(Rect2d rect, IBrush brush)
+		public void FillRect(Rect2d rect, DrawStyle style)
 		{
-			if (brush is not SkiaBrush skiaBrush)
-				throw new NotSupportedException("This method requires a SkiaBrush.");
+			ApplyStyle(style);
+			_canvas.DrawRect(rect.ToSKRect(), _paint);
+		}
 
-			skiaBrush.Apply(_paint);
-			_canvas.DrawRect(new SKRect((float)rect.X, (float)rect.Y,
-				(float)(rect.X + rect.Width), (float)(rect.Y + rect.Height)),
-				_paint);
+		public void FillRoundRect(Rect2d rect, CornerRadii radii, DrawStyle style)
+		{
+			ApplyStyle(style);
+			DrawRoundRectInternal(rect, radii);
+		}
+
+		public void DrawRoundRect(Rect2d rect, CornerRadii radii, DrawStyle style)
+		{
+			ApplyStyle(style);
+			_paint.Style = SKPaintStyle.Stroke;
+			DrawRoundRectInternal(rect, radii);
+			_paint.Style = SKPaintStyle.Fill;
+		}
+
+		private void DrawRoundRectInternal(Rect2d rect, CornerRadii radii)
+		{
+			const double Epsilon = 0.000001;
+
+			if (rect.Width < Epsilon || rect.Height < Epsilon || radii.IsEffectivelyZero)
+			{
+				// Degenerate case: It's just a rectangle, not rounded, or too small
+				// for rounding to be visible.
+				_canvas.DrawRect(rect.ToSKRect(), _paint);
+				return;
+			}
+
+			// General case: Four elliptical radii, one for each corner.
+			_roundRect = new SKRoundRect();
+
+			_roundRect.SetRectRadii(rect.ToSKRect(),
+			[
+				new SKPoint((float)radii.TopLeft.X,     (float)radii.TopLeft.Y),
+				new SKPoint((float)radii.TopRight.X,    (float)radii.TopRight.Y),
+				new SKPoint((float)radii.BottomRight.X, (float)radii.BottomRight.Y),
+				new SKPoint((float)radii.BottomLeft.X,  (float)radii.BottomLeft.Y),
+			]);
+
+			_canvas.DrawRoundRect(_roundRect, _paint);
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void ApplyStyle(DrawStyle style)
+		{
+			if (style == _lastDrawStyle)
+				return;
+			ApplyStyleForReal(style);
+		}
+
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		private void ApplyStyleForReal(DrawStyle style)
+		{
+			if (style.Color != _lastDrawStyle.Color
+				|| style.Brush != _lastDrawStyle.Brush
+				|| style.BrushRect != _lastDrawStyle.BrushRect)
+			{
+				if (style.Color.HasValue)
+				{
+					_paint.Color = style.Color.Value.ToSKColor();
+					_paint.Shader = null;
+				}
+				else if (style.Brush is not ISkiaBrush skiaBrush)
+				{
+					System.Diagnostics.Debug.WriteLine("Warning: Drawing without a color or brush; defaulting to black.");
+					_paint.Color = Color32.Black.ToSKColor();
+					_paint.Shader = null;
+				}
+				else skiaBrush.Apply(_paint, style.BrushRect);
+			}
+
+			if (style.LineThickness != _lastDrawStyle.LineThickness)
+			{
+				_paint.StrokeWidth = (float)style.LineThickness;
+			}
+
+			if (style.Transform != _lastDrawStyle.Transform)
+			{
+				_canvas.SetMatrix(style.Transform.ToSKMatrix());
+			}
+
+			if (style.Font != _lastDrawStyle.Font)
+			{
+				_currentFont = (style.Font as SkiaFont)?.Font ?? _defaultFont;
+			}
+
+			_lastDrawStyle = style;
 		}
 	}
 }

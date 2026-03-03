@@ -5,7 +5,6 @@ namespace Onyx.Rendering
 {
 	public interface IRenderables
 	{
-		IBrush CreateSolidBrush(Color32 color);
 		IBrush CreateLinearGradientBrush(LinearGradient linearGradient);
 		IBrush CreateRadialGradientBrush(RadialGradient radialGradient);
 		IImage? CreateImage(string url);

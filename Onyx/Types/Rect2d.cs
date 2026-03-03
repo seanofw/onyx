@@ -22,6 +22,16 @@ namespace Onyx.Types
 			get => new Size2d(Width, Height);
 		}
 
+		public Vector2d TopLeft => new Vector2d(X, Y);
+		public Vector2d TopCenter => new Vector2d(X + Width * 0.5, Y);
+		public Vector2d TopRight => new Vector2d(X + Width, Y);
+		public Vector2d LeftCenter => new Vector2d(X, Y + Width * 0.5);
+		public Vector2d Center => new Vector2d(X + Width * 0.5, Y + Width * 0.5);
+		public Vector2d RightCenter => new Vector2d(X + Width, Y + Width * 0.5);
+		public Vector2d BottomLeft => new Vector2d(X, Y + Height);
+		public Vector2d BottomCenter => new Vector2d(X + Width * 0.5, Y + Height);
+		public Vector2d BottomRight => new Vector2d(X + Width, Y + Height);
+
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public Rect2d()
 			=> X = Y = Width = Height = 0;
