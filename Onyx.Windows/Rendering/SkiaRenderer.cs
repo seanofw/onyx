@@ -21,6 +21,7 @@ namespace Onyx.Windows.Rendering
 		{
 			_canvas = canvas;
 			_paint = new SKPaint();
+			_paint.IsAntialias = true;
 			_currentFont = _defaultFont = new SKFont(SKTypeface.CreateDefault(), 12);
 			_roundRect = new SKRoundRect();
 		}

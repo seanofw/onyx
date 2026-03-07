@@ -1,6 +1,6 @@
 namespace Onyx.Rendering
 {
-	public interface IFont
+	public interface IFont : IDisposable
 	{
 		FontInfo FontInfo { get; }
 

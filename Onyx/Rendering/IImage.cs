@@ -2,7 +2,7 @@ using Onyx.Types;
 
 namespace Onyx.Rendering
 {
-	public interface IImage
+	public interface IImage : IDisposable
 	{
 		Size2d? Size { get; }
 		Size2d MinSize { get; }

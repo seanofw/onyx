@@ -2,7 +2,7 @@ using Onyx.Types;
 
 namespace Onyx.Rendering
 {
-	public interface IClipper
+	public interface IClipper : IDisposable
 	{
 		IClipper Union(IEnumerable<IClipper> others);
 		IClipper Intersect(IEnumerable<IClipper> others);

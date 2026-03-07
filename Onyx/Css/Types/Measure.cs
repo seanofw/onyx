@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 
@@ -159,6 +159,24 @@ namespace Onyx.Css.Types
 
 		private const double GradToDeg = 90 / 100;
 		private const double DegToGrad = 100 / 90;
+
+		/// <summary>
+		/// Convert between measures of equivalent units.  This can apply all valid
+		/// conversions.  Note that "em" and "ex" are only measured relative to their
+		/// fonts, so they cannot be converted at all.  The relationship between pixels
+		/// and physical measurements is fixed at 72, per the CSS spec.
+		/// </summary>
+		/// <param name="units">The target unit of measure.</param>
+		/// <returns>The resulting measure.</returns>
+		/// <exception cref="ArgumentException">Thrown if this measure cannot be
+		/// converted to the given target units.</exception>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public Measure ConvertTo(Units units)
+			=> units == Units
+					? this
+				: TryConvert(units, out Measure newMeasure)
+					? newMeasure
+				: throw new ArgumentException($"Cannot convert '{this}' to '{units}'.");
 
 		/// <summary>
 		/// Convert between measures of equivalent units.  This can apply all valid

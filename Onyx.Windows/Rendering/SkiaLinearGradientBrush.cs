@@ -58,17 +58,16 @@ namespace Onyx.Windows.Rendering
 					return;
 				}
 
-				(Vector2d start, Vector2d end) = CalculateStartAndEndPoints(rect, _linearGradient);
-				double lineLength = Math.Max((end - start).Length, 0.000001);
+				(Vector2d start, Vector2d end) = _linearGradient.GetStartAndEndPoints(rect);
+				IReadOnlyList<(Color32 Color, double Offset)> resolvedColorStops = _linearGradient.CalculateColorStops((end - start).Length);
 
-				SKColor[] colors = new SKColor[colorStops.Count];
-				float[] offsets = new float[colorStops.Count];
+				SKColor[] colors = new SKColor[resolvedColorStops.Count];
+				float[] offsets = new float[resolvedColorStops.Count];
 
-				for (int i = 0; i < colorStops.Count; i++)
+				for (int i = 0; i < resolvedColorStops.Count; i++)
 				{
-					colors[i] = colorStops[i].Color?.ToSKColor() ?? new SKColor(255, 255, 255);
-					Measure measure = colorStops[i].Measure;
-					offsets[i] = CalculateColorStopOffset(measure, lineLength);
+					colors[i] = resolvedColorStops[i].Color.ToSKColor();
+					offsets[i] = (float)resolvedColorStops[i].Offset;
 				}
 
 				_shader?.Dispose();
@@ -79,45 +78,6 @@ namespace Onyx.Windows.Rendering
 
 			if (paint.Color != _white)
 				paint.Color = _white;
-		}
-
-		private static float CalculateColorStopOffset(Measure measure, double lineLength)
-			=> measure.Units switch
-			{
-				Units.Pixels => (float)(measure.Value / lineLength),
-				Units.Percent => (float)(measure.Value / 100.0),
-				_ => 0,
-			};
-
-		private static (Vector2d Start, Vector2d End) CalculateStartAndEndPoints(Rect2d rect, LinearGradient linearGradient)
-		{
-			double angle = linearGradient.AngleInRadians;
-
-			// Convert CSS angle to math angle.  Because CSS is weird, that's why.  And then
-			// flip it upside-down because Y points downward because we're on a screen.
-			double theta = angle - (Math.PI * 0.5);
-
-			Vector2d direction = new Vector2d(Math.Cos(theta), Math.Sin(theta));
-
-			Vector2d center = rect.Center;
-
-			double min = double.PositiveInfinity;
-			double max = double.NegativeInfinity;
-
-			foreach (Vector2d corner in new[]
-				{ rect.TopLeft, rect.TopRight, rect.BottomRight, rect.BottomLeft })
-			{
-				Vector2d relative = corner - center;
-				double projection = relative.Dot(direction);
-
-				min = Math.Min(min, projection);
-				max = Math.Max(max, projection);
-			}
-
-			Vector2d start = center + direction * min;
-			Vector2d end   = center + direction * max;
-
-			return (start, end);
 		}
 	}
 }

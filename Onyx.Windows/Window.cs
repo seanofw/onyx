@@ -1107,31 +1107,40 @@ namespace Onyx.Windows
 
 			renderer.Clear(DefaultBackgroundColor);
 
-			IFont? font = renderables.CreateFont(new FontInfo("Segoe UI", 14), false);
-			IBrush gradientBrush = new SkiaLinearGradientBrush(new LinearGradient
+			using IFont? font = renderables.CreateFont(new FontInfo("Segoe UI", 14), false);
+
+			// linear-gradient(to bottom, #b8e1fc 0%,#a9d2f3 10%,#90bae4 25%,#90bcea 37%,#90bff0 50%,#6ba8e5 51%,#a2daf5 83%,#bdf3fd 100%)
+			LinearGradient blueGradient = new LinearGradient
 			{
 				UsesTo = true,
-				SideOrCorner = SideOrCorner.TopRight,
+				SideOrCorner = SideOrCorner.Bottom,
 				ColorStops =
 				[
-					new ColorStop
-					{
-						Measure = new Measure(Units.Percent, 49),
-						Color = Color32.Red,
-					},
-					new ColorStop
-					{
-						Measure = new Measure(Units.Percent, 51),
-						Color = Color32.Green,
-					}
+					new ColorStop(new Color32(0xb8, 0xe1, 0xfc), new Measure(Units.Percent, 0)),
+					new ColorStop(new Color32(0xa9, 0xd2, 0xf3), new Measure(Units.Percent, 10)),
+					new ColorStop(new Color32(0x90, 0xba, 0xe4), new Measure(Units.Percent, 25)),
+					new ColorStop(new Color32(0x90, 0xbc, 0xea), new Measure(Units.Percent, 37)),
+					new ColorStop(new Color32(0x90, 0xbf, 0xf0), new Measure(Units.Percent, 50)),
+					new ColorStop(new Color32(0x6b, 0xa8, 0xe5), new Measure(Units.Percent, 51)),
+					new ColorStop(new Color32(0xa2, 0xda, 0xf5), new Measure(Units.Percent, 83)),
+					new ColorStop(new Color32(0xbd, 0xf3, 0xfd), new Measure(Units.Percent, 100))
 				]
-			});
+			};
+
+			using IBrush gradientBrush = new SkiaLinearGradientBrush(blueGradient);
 
 			DrawStyle style = DrawStyle.Default.WithFont(font!);
 
-			renderer.FillRect(new Rect2d(10, 10, 200, 100),
-				style.WithBrush(gradientBrush, new Rect2d(10, 10, 200, 100)));
-			renderer.FillRect(new Rect2d(100, 100, 200, 100), style.WithColor(Color32.Blue));
+			renderer.FillRect(new Rect2d(100, 100, 200, 100), style.WithColor(Color32.CadetBlue));
+
+			for (int i = 0; i < 50; i++)
+			{
+				Rect2d rect = new Rect2d(10 + i * 10, 10 + i * 10, 200, 100);
+				renderer.FillRoundRect(rect, new CornerRadii(24),
+					style.WithBrush(gradientBrush, rect));
+				renderer.DrawRoundRect(rect, new CornerRadii(24),
+					style.WithColor(new Color32(0x6b, 0xa8, 0xe5)).WithLineThickness(1.5));
+			}
 
 			DrawStyle blackStyle = style.WithColor(Color32.Black);
 
@@ -1139,9 +1148,6 @@ namespace Onyx.Windows
 			renderer.DrawText(lineStart, "Hello, World.", blackStyle);
 			lineStart += new Vector2d(0, font!.FontMetrics.LineHeight);
 			renderer.DrawText(lineStart, "Goodbye, World.", blackStyle);
-
-			if (font is IDisposable disposableFont)
-				disposableFont.Dispose();
 
 			//---- End Document rendering.
 

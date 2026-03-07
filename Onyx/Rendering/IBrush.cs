@@ -1,4 +1,4 @@
 namespace Onyx.Rendering
 {
-	public interface IBrush { }
+	public interface IBrush : IDisposable { }
 }
