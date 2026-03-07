@@ -1,7 +1,5 @@
-﻿using System.Runtime.CompilerServices;
 using System.Text;
 using Onyx.Css.Selectors;
-using Onyx.Html.Dom;
 
 //-----------------------------------------------------------------------------------------------
 //
@@ -69,7 +67,7 @@ namespace Onyx.Css.Parsing
 		/// warnings will be emitted as errors.</param>
 		public CssSelectorParser(Messages? messages = null, bool strict = false)
 		{
-			Messages = new Messages();
+			Messages = messages ?? new Messages();
 			_strict = strict;
 		}
 
@@ -117,7 +115,7 @@ namespace Onyx.Css.Parsing
 
 				selectors.Add(selector);
 
-				SkipWhitespace(lexer);
+				CssParser.SkipWhitespace(lexer);
 
 			} while ((token = lexer.Next()).Kind == CssTokenKind.Comma);
 
@@ -161,7 +159,7 @@ namespace Onyx.Css.Parsing
 			if (throwOnError)
 				Messages.Clear();
 
-			SkipWhitespace(lexer);
+			CssParser.SkipWhitespace(lexer);
 
 			SimpleSelector? simpleSelector = ParseSimpleSelector(lexer);
 			if (simpleSelector == null)
@@ -189,17 +187,17 @@ namespace Onyx.Css.Parsing
 						goto parseSimple;
 
 					case CssTokenKind.Tilde:
-						SkipWhitespace(lexer);
+						CssParser.SkipWhitespace(lexer);
 						combinator = Combinator.GeneralSibling;
 						goto parseSimple;
 
 					case CssTokenKind.Plus:
-						SkipWhitespace(lexer);
+						CssParser.SkipWhitespace(lexer);
 						combinator = Combinator.AdjacentSibling;
 						goto parseSimple;
 
 					case CssTokenKind.GreaterThan:
-						SkipWhitespace(lexer);
+						CssParser.SkipWhitespace(lexer);
 						combinator = Combinator.Child;
 						goto parseSimple;
 
@@ -404,7 +402,7 @@ namespace Onyx.Css.Parsing
 			{
 				// Handle cases where the filter function is actually another selector.
 				CompoundSelector? args = ParseCompoundSelector(lexer);
-				SkipWhitespace(lexer);
+				CssParser.SkipWhitespace(lexer);
 
 				if ((token = lexer.Next()).Kind != CssTokenKind.RightParen)
 				{
@@ -477,7 +475,7 @@ namespace Onyx.Css.Parsing
 		{
 			CssToken token;
 
-			SkipWhitespace(lexer);
+			CssParser.SkipWhitespace(lexer);
 
 			if ((token = lexer.Next()).Kind != CssTokenKind.Ident)
 			{
@@ -487,7 +485,7 @@ namespace Onyx.Css.Parsing
 			}
 			string? attrName = token.Text?.ToLowerInvariant();
 
-			SkipWhitespace(lexer);
+			CssParser.SkipWhitespace(lexer);
 
 			SelectorFilterKind selectorFilterKind = SelectorFilterKind.None;
 
@@ -527,7 +525,7 @@ namespace Onyx.Css.Parsing
 					return default;
 			}
 
-			SkipWhitespace(lexer);
+			CssParser.SkipWhitespace(lexer);
 
 			string? attrValue;
 			if ((token = lexer.Next()).Kind == CssTokenKind.Ident)
@@ -541,12 +539,12 @@ namespace Onyx.Css.Parsing
 				return default;
 			}
 
-			SkipWhitespace(lexer);
+			CssParser.SkipWhitespace(lexer);
 
 			if ((token = lexer.Next()).Kind == CssTokenKind.Ident)
 			{
 				string? caseSensitivity = token.Text;
-				SkipWhitespace(lexer);
+				CssParser.SkipWhitespace(lexer);
 
 				if (caseSensitivity == "i" || caseSensitivity == "I")
 					selectorFilterKind = selectorFilterKind - SelectorFilterKind.AttribEq + SelectorFilterKind.CaseInsensitive;
@@ -575,25 +573,13 @@ namespace Onyx.Css.Parsing
 		#region Support methods
 
 		/// <summary>
-		/// Support method:  Skip optional whitespace.
-		/// </summary>
-		/// <param name="lexer">The lexer to eat whitespace tokens from.</param>
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static void SkipWhitespace(CssLexer lexer)
-		{
-			CssToken token;
-			while ((token = lexer.Next()).Kind == CssTokenKind.Space) ;
-			lexer.Unget(token);
-		}
-
-		/// <summary>
 		/// Require an end-of-input marker, or emit an error if one is not found.
 		/// </summary>
 		/// <param name="lexer">The lexer that should be at the end of its input.</param>
 		/// <returns>True if at the end of the input, false if more content was found.</returns>
 		private bool ExpectEoi(CssLexer lexer)
 		{
-			SkipWhitespace(lexer);
+			CssParser.SkipWhitespace(lexer);
 
 			CssToken token;
 			if ((token = lexer.Next()).Kind != CssTokenKind.Eoi)

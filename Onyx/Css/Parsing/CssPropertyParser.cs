@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
 using Onyx.Css.Properties;
-using Onyx.Css.Properties.KnownProperties;
 
 namespace Onyx.Css.Parsing
 {
@@ -31,7 +29,7 @@ namespace Onyx.Css.Parsing
 		/// warnings will be emitted as errors.</param>
 		public CssPropertyParser(Messages? messages = null, bool strict = false)
 		{
-			Messages = new Messages();
+			Messages = messages ?? new Messages();
 			_strict = strict;
 		}
 
@@ -74,7 +72,7 @@ namespace Onyx.Css.Parsing
 			KnownPropertyKind kind = StyleProperty.PropertyKindLookup.TryGetValue(name, out KnownPropertyKind k)
 				? k : KnownPropertyKind.Unknown;
 
-			SkipWhitespace(lexer);
+			CssParser.SkipWhitespace(lexer);
 
 			if ((token = lexer.Next()).Kind != CssTokenKind.Colon)
 			{
@@ -85,14 +83,14 @@ namespace Onyx.Css.Parsing
 				return null;
 			}
 
-			SkipWhitespace(lexer);
+			CssParser.SkipWhitespace(lexer);
 
 			CssLexerPosition propertyStart = lexer.Here();
 
 			if (!PropertySyntaxDefinitions.Syntaxes.TryGetValue(kind, out MiniParser? miniParser))
 			{
 				// Don't know what this is.
-				CssToken[] tokens = CollectInvalidTokens(lexer);
+				CssToken[] tokens = CssParser.CollectInvalidTokens(lexer);
 				return new UnknownProperty { Name = name, Tokens = tokens };
 			}
 
@@ -149,7 +147,7 @@ namespace Onyx.Css.Parsing
 				if (parsedProperty == null)
 				{
 					lexer.Rewind(propertyStart);
-					CssToken[] tokens = CollectInvalidTokens(lexer);
+					CssToken[] tokens = CssParser.CollectInvalidTokens(lexer);
 					return new UnknownProperty { Name = name, Tokens = tokens };
 				}
 
@@ -172,145 +170,6 @@ namespace Onyx.Css.Parsing
 
 			// We got it, so return it.
 			return styleProperty;
-		}
-
-		#endregion
-
-		#region Support methods
-
-		/// <summary>
-		/// CSS parsing rules require that for invalid input, we must consume to the next
-		/// closing ')', ']', '}', or ';', but must respect nesting.  So here's a fun recursive
-		/// function that eats invalid declarations (probably).
-		/// </summary>
-		/// <param name="lexer">The lexer to eat invalid declarations from.</param>
-		/// <returns>The tokens collected for the invalid property.</returns>
-		private static CssToken[] CollectInvalidTokens(CssLexer lexer)
-		{
-			List<CssToken> tokens = new List<CssToken>();
-			CollectInvalidTokens(lexer, tokens);
-			return tokens.ToArray();
-		}
-
-		/// <summary>
-		/// CSS parsing rules require that for invalid input, we must consume to the next
-		/// closing ')', ']', '}', or ';', but must respect nesting.  So here's a fun recursive
-		/// function that eats invalid declarations (probably).
-		/// </summary>
-		/// <param name="lexer">The lexer to eat invalid declarations from.</param>
-		/// <param name="tokens">The tokens being collected for the invalid property.</param>
-		private static void CollectInvalidTokens(CssLexer lexer, ICollection<CssToken> tokens)
-		{
-			CssToken token;
-
-			while ((token = lexer.Next()).Kind != CssTokenKind.RightBrace
-				&& token.Kind != CssTokenKind.RightParen
-				&& token.Kind != CssTokenKind.RightBracket
-				&& token.Kind != CssTokenKind.Semicolon
-				&& token.Kind != CssTokenKind.Eoi)
-			{
-				if (token.Kind == CssTokenKind.LeftBrace)
-				{
-					while (true)
-					{
-						CollectInvalidTokens(lexer, tokens);
-						if ((token = lexer.Next()).Kind == CssTokenKind.Eoi)
-						{
-							lexer.Unget(token);
-							break;
-						}
-						else
-						{
-							tokens.Add(token);
-							if (token.Kind == CssTokenKind.RightBrace)
-								break;
-						}
-					}
-				}
-				else if (token.Kind == CssTokenKind.LeftBracket)
-				{
-					while (true)
-					{
-						CollectInvalidTokens(lexer, tokens);
-						if ((token = lexer.Next()).Kind == CssTokenKind.Eoi)
-						{
-							lexer.Unget(token);
-							break;
-						}
-						else
-						{
-							tokens.Add(token);
-							if (token.Kind == CssTokenKind.RightBracket)
-								break;
-						}
-					}
-				}
-				else if (token.Kind == CssTokenKind.LeftParen)
-				{
-					while (true)
-					{
-						CollectInvalidTokens(lexer, tokens);
-						if ((token = lexer.Next()).Kind == CssTokenKind.Eoi)
-						{
-							lexer.Unget(token);
-							break;
-						}
-						else
-						{
-							tokens.Add(token);
-							if (token.Kind == CssTokenKind.RightParen)
-								break;
-						}
-					}
-				}
-				else tokens.Add(token);
-			}
-
-			lexer.Unget(token);
-		}
-
-		/// <summary>
-		/// Support method:  Skip optional whitespace.
-		/// </summary>
-		/// <param name="lexer">The lexer to eat whitespace tokens from.</param>
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static void SkipWhitespace(CssLexer lexer)
-		{
-			CssToken token;
-			while ((token = lexer.Next()).Kind == CssTokenKind.Space) ;
-			lexer.Unget(token);
-		}
-
-		/// <summary>
-		/// Require an end-of-input marker, or emit an error if one is not found.
-		/// </summary>
-		/// <param name="lexer">The lexer that should be at the end of its input.</param>
-		/// <returns>True if at the end of the input, false if more content was found.</returns>
-		private bool ExpectEoi(CssLexer lexer)
-		{
-			SkipWhitespace(lexer);
-
-			CssToken token;
-			if ((token = lexer.Next()).Kind != CssTokenKind.Eoi)
-			{
-				lexer.Unget(token);
-				Error(token.SourceLocation, "Unexpected content in selector");
-				return false;
-			}
-
-			return true;
-		}
-
-		/// <summary>
-		/// Emit an error to the Messages collection.  In strict mode, this will be
-		/// an actual error; in non-strict mode, this is emitted as a warning, since
-		/// the rest of the CSS parser will just recover and skip this rule.
-		/// </summary>
-		/// <param name="sourceLocation">The location at which the error occurred.</param>
-		/// <param name="message">The message to emit.</param>
-		private void Error(SourceLocation? sourceLocation, string message)
-		{
-			Messages.Add(new Message(_strict ? MessageKind.Error : MessageKind.Warning, message, sourceLocation));
 		}
 
 		#endregion

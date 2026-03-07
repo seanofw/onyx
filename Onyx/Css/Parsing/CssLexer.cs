@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Onyx.Css.Parsing
@@ -315,6 +315,7 @@ namespace Onyx.Css.Parsing
 						new SourceLocation(_filename, startLine, start - startLineStart, start, _ptr - start));
 
 				case '@':
+					_ptr++;
 					ident = ParseIdent();
 					return new CssToken(CssTokenKind.At, ident, default,
 						new SourceLocation(_filename, startLine, start - startLineStart, start, _ptr - start));

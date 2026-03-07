@@ -198,18 +198,12 @@ namespace Onyx.Html
 				{
 					if (text[i] == '#')
 					{
-						// Numeric entity:  Consume decimal digits.
+						// Numeric entity:  &#NNN; (decimal) or &#xHHH; (hexadecimal).
 						i++;
-
-						char ch;
-						while (i < text.Length && (ch = text[i]) >= '0' && ch <= '9')
-							i++;
-						if (i > (start + 2) && i < (start + 10))
-						{
-							value = long.Parse(text.Slice(start + 2, i - (start + 2)), CultureInfo.InvariantCulture);
-							if (value < 0 || value > 0x110000)
-								value = -1;     // Bad character.
-						}
+						if (i < text.Length && (text[i] == 'x' || text[i] == 'X'))
+							(value, i) = ParseNumericEntity(text, i + 1, 16);
+						else
+							(value, i) = ParseNumericEntity(text, i, 10);
 					}
 					else
 					{
@@ -242,6 +236,56 @@ namespace Onyx.Html
 						stringBuilder.Append(text.Slice(start, i - start));
 				}
 			}
+		}
+
+		/// <summary>
+		/// Lookup table mapping ASCII characters to their digit values.  '0'-'9' map to 0-9,
+		/// 'A'-'F'/'a'-'f' map to 10-15, and everything else maps to -1 (0xFF as a byte).
+		/// Indexing by character avoids all branching in the digit-parsing loop.
+		/// </summary>
+		private static readonly sbyte[] _digitValues = CreateDigitValueTable();
+
+		private static sbyte[] CreateDigitValueTable()
+		{
+			sbyte[] table = new sbyte[128];
+			Array.Fill(table, (sbyte)-1);
+			for (int i = 0; i <= 9; i++)
+				table['0' + i] = (sbyte)i;
+			for (int i = 0; i < 6; i++)
+			{
+				table['A' + i] = (sbyte)(10 + i);
+				table['a' + i] = (sbyte)(10 + i);
+			}
+			return table;
+		}
+
+		/// <summary>
+		/// Parse a numeric entity value from the text at the given position.  Works for
+		/// both decimal (base 10) and hexadecimal (base 16) entities using a single
+		/// lookup table.
+		/// </summary>
+		/// <param name="text">The full text being parsed.</param>
+		/// <param name="ptr">The position to start reading digits from.</param>
+		/// <param name="numericBase">The numeric base: 10 for decimal, 16 for hexadecimal.</param>
+		/// <returns>A tuple of the parsed code point value (or -1 if the input is empty,
+		/// contains invalid digits, or produces a value outside the Unicode range) and
+		/// the new read position past the consumed digits.</returns>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static (long Value, int Ptr) ParseNumericEntity(ReadOnlySpan<char> text,
+			int ptr, int numericBase)
+		{
+			long value = 0;
+			int ch, digit, digitStart = ptr;
+
+			while (ptr < text.Length
+				&& (ch = text[ptr]) < 128
+				&& (digit = _digitValues[ch]) >= 0 && digit < numericBase)
+			{
+				value = (value * numericBase) + digit;
+				ptr++;
+			}
+
+			return (ptr > digitStart && value <= 0x110000) ? (value, ptr) : (-1, ptr);
 		}
 
 		/// <summary>

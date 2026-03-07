@@ -84,7 +84,7 @@ namespace Onyx.Html.Parsing
 		/// <param name="messages">The set of error messages to write to any time the parser discovers bad HTML.</param>
 		public HtmlParser(Messages? messages = null)
 		{
-			Messages = new Messages();
+			Messages = messages ?? new Messages();
 		}
 
 		#endregion
@@ -148,7 +148,8 @@ namespace Onyx.Html.Parsing
 			return fragment;
 		}
 
-		private static readonly HtmlParser _innerHtmlParser = new HtmlParser();
+		[ThreadStatic]
+		private static HtmlParser? _innerHtmlParser;
 
 		/// <summary>
 		/// Parse HTML text for the InnerHtml property of an element.
@@ -157,13 +158,14 @@ namespace Onyx.Html.Parsing
 		/// <param name="parent">The element that will be the new parent.</param>
 		internal static void ParseInnerHtml(string text, ContainerNode parent)
 		{
-			_innerHtmlParser.Messages.Clear();
+			HtmlParser parser = _innerHtmlParser ??= new HtmlParser();
+			parser.Messages.Clear();
 
 			parent.Clear();
 
-			HtmlLexer lexer = new HtmlLexer(text, "<innerHtml>", _innerHtmlParser.Messages);
+			HtmlLexer lexer = new HtmlLexer(text, "<innerHtml>", parser.Messages);
 
-			_innerHtmlParser.ParseTokens(lexer, parent);
+			parser.ParseTokens(lexer, parent);
 		}
 
 		/// <summary>
@@ -172,7 +174,10 @@ namespace Onyx.Html.Parsing
 		/// <param name="text">The HTML text to parse.</param>
 		/// <returns>The new DocumentFragment.</returns>
 		internal static DocumentFragment ParseOuterHtml(string text)
-			=> _innerHtmlParser.ParseDocumentFragment(text, "<outerhtml>");
+		{
+			HtmlParser parser = _innerHtmlParser ??= new HtmlParser();
+			return parser.ParseDocumentFragment(text, "<outerhtml>");
+		}
 
 		#endregion
 

@@ -1,6 +1,8 @@
 using Onyx.Css;
 using Onyx.Css.Computed;
 using Onyx.Css.Parsing;
+using Onyx.Css.Types;
+using Onyx.Css.Types.Media;
 using Onyx.Html.Dom;
 using Onyx.Types;
 using Onyx.Windows;
@@ -56,6 +58,12 @@ namespace TestProgram
 			IEnumerable<Node> nodes3 = document.Find("#frob").Find(".foo");
 
 			const string StylesheetText = @"
+input[type=text] {
+	border: 1px solid #CCC;
+	background: white;
+	font: 14px Arial;
+}
+
 window {
 	display: flex;
 	background: white;
@@ -63,25 +71,28 @@ window {
 	color: green;
 }
 
-input[type=text] {
-	border: 1px solid #CCC;
-	background: white;
-	font: 14px Arial;
-}
-
 .foo .foo {
 	color: orange;
 }
 
-.foo {
-	color: red;
-	background: green;
+@media screen and (min-width: 640px) {
+	.foo {
+		color: red;
+		background: green;
+	}
 }
 ";
 
 			CssParser parser = new CssParser();
 			Stylesheet stylesheet = parser.Parse(StylesheetText, "<inline>");
 			document.AddStylesheet(stylesheet);
+
+			document.MediaInfo = new MediaInfo(MediaType.Screen);
+
+			document.MediaDimensions = new MediaDimensions(
+				width: new Measure(Units.Pixels, 640),
+				height: new Measure(Units.Pixels, 480)
+			);
 
 			Element? foo = document.Get("#foo");
 

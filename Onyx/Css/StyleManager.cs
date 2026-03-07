@@ -1,6 +1,7 @@
 using Onyx.Css.Computed;
 using Onyx.Css.Properties;
 using Onyx.Css.Selectors;
+using Onyx.Css.Types.Media;
 using Onyx.Extensions;
 using Onyx.Html.Dom;
 
@@ -135,12 +136,13 @@ namespace Onyx.Css
 		/// Look up styles for the given element.  
 		/// </summary>
 		/// <param name="element">The element to locate styles for.</param>
+		/// <param name="context">The context that describes how to answer media queries.</param>
 		/// <returns>*All* of the StylePropertySets that should be applied to
 		/// this element.  Note that they are not ordered by specificity, and those
 		/// that are overridden are still included, and shorthand properties are not
 		/// expanded:  The returned collection is the "raw" style collection, with
 		/// the correct specificity to apply for each property set.</returns>
-		public IReadOnlyCollection<StylePropertySetWithSpecificity> GetStyleRules(Element element)
+		public IReadOnlyCollection<StylePropertySetWithSpecificity> GetStyleRules(Element element, MediaQueryContext context)
 		{
 			ArgumentNullException.ThrowIfNull(element, nameof(element));
 
@@ -150,6 +152,14 @@ namespace Onyx.Css
 
 			foreach (StyleRule rule in candidates)
 			{
+				if (rule.MediaQuery != null)
+				{
+					Func<MediaQueryContext, bool?> mediaQueryEval = rule.MediaQuery.GetEval();
+					bool? isMediaQuerySatisfied = mediaQueryEval(context);
+					if (isMediaQuerySatisfied != true)
+						continue;
+				}
+
 				Specificity specificity = Specificity.Zero;
 
 				foreach (Selector selector in rule.Selector.Selectors)
@@ -185,7 +195,10 @@ namespace Onyx.Css
 
 			HashSet<StyleRule> candidates = new HashSet<StyleRule>(_genericIndex);
 
-			if (_idIndex.TryGetValue(element.Id, out List<StyleRule>? rules))
+			if (_elementNameIndex.TryGetValue(element.NodeName, out List<StyleRule>? rules))
+				candidates.UnionWith(rules);
+
+			if (_idIndex.TryGetValue(element.Id, out rules))
 				candidates.UnionWith(rules);
 
 			foreach (string className in element.ClassNames)
@@ -202,14 +215,15 @@ namespace Onyx.Css
 		/// from the given parent style.
 		/// </summary>
 		/// <param name="element">The element whose style is to be computed.</param>
+		/// <param name="context">The context that describes how to answer media queries.</param>
 		/// <param name="parentStyle">The parent style to inherit from.</param>
 		/// <returns>The element's finished computed style.</returns>
-		public ComputedStyle ComputeStyle(Element element, ComputedStyle? parentStyle = null)
+		public ComputedStyle ComputeStyle(MediaQueryContext context, Element element, ComputedStyle? parentStyle = null)
 		{
 			ArgumentNullException.ThrowIfNull(element, nameof(element));
 
 			// Look up the sets of styles that should be applied, with their specificities.
-			List<StylePropertySetWithSpecificity> styleRules = (List<StylePropertySetWithSpecificity>)GetStyleRules(element);
+			List<StylePropertySetWithSpecificity> styleRules = (List<StylePropertySetWithSpecificity>)GetStyleRules(element, context);
 
 			// If there are inline styles on this element, add those too.
 			StylePropertySet inlineStyles = element.InlineStyles;

@@ -1,6 +1,8 @@
 using System.Text;
 using Onyx.Boxes;
 using Onyx.Css;
+using Onyx.Css.Types;
+using Onyx.Css.Types.Media;
 using Onyx.Types;
 
 namespace Onyx.Html.Dom
@@ -29,6 +31,37 @@ namespace Onyx.Html.Dom
 			get => InnerHtml;
 			set => InnerHtml = value;
 		}
+
+		MediaQueryContext IStyleRoot.MediaQueryContext
+			=> new MediaQueryContext(MediaDimensions, MediaInfo);
+
+		public MediaInfo MediaInfo
+		{
+			get => _mediaInfo;
+			set
+			{
+				if (!object.Equals(_mediaInfo, value))
+				{
+					_mediaInfo = value;
+					InvalidateChildComputedStyles();
+				}
+			}
+		}
+		private MediaInfo _mediaInfo = default;
+
+		public MediaDimensions MediaDimensions
+		{
+			get => _mediaDimensions;
+			set
+			{
+				if (!object.Equals(_mediaDimensions, value))
+				{
+					_mediaDimensions = value;
+					InvalidateChildComputedStyles();
+				}
+			}
+		}
+		private MediaDimensions _mediaDimensions = default;
 
 		/// <summary>
 		/// Get or change the size of the viewport containing this document, in pixels.
