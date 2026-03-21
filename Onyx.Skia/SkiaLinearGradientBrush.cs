@@ -2,9 +2,9 @@ using Onyx.Css.Types;
 using Onyx.Types;
 using SkiaSharp;
 
-namespace Onyx.Windows.Rendering
+namespace Onyx.Skia
 {
-	internal class SkiaLinearGradientBrush : ISkiaBrush, IDisposable
+	public class SkiaLinearGradientBrush : ISkiaBrush, IDisposable
 	{
 		private SKShader? _shader;
 

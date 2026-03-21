@@ -2,9 +2,9 @@ using Onyx.Rendering;
 using Onyx.Types;
 using SkiaSharp;
 
-namespace Onyx.Windows.Rendering
+namespace Onyx.Skia
 {
-	internal class SkiaClipper : SkiaDisposable, IClipper
+	public class SkiaClipper : SkiaDisposable, IClipper
 	{
 		public SKPath Path { get; private set; }
 

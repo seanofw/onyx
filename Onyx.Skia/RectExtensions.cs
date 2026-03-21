@@ -2,9 +2,9 @@ using System.Runtime.CompilerServices;
 using Onyx.Types;
 using SkiaSharp;
 
-namespace Onyx.Windows.Rendering
+namespace Onyx.Skia
 {
-	internal static class RectExtensions
+	public static class RectExtensions
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static SKRect ToSKRect(this Rect2d rect)

@@ -1,9 +1,9 @@
 using Onyx.Types;
 using SkiaSharp;
 
-namespace Onyx.Windows.Rendering
+namespace Onyx.Skia
 {
-	internal static class MatrixExtensions
+	public static class MatrixExtensions
 	{
 		public static SKMatrix ToSKMatrix(this Matrix3x2d matrix)
 			=> new SKMatrix(

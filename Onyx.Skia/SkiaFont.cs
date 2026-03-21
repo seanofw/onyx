@@ -2,9 +2,9 @@ using Onyx.Rendering;
 using Onyx.Types;
 using SkiaSharp;
 
-namespace Onyx.Windows.Rendering
+namespace Onyx.Skia
 {
-	internal class SkiaFont : IFont
+	public class SkiaFont : IFont
 	{
 		public FontInfo FontInfo { get; }
 
@@ -17,9 +17,6 @@ namespace Onyx.Windows.Rendering
 			FontInfo = fontInfo;
 			Font = font;
 
-			double emWidth = MeasureText("M").Size.Width;
-			double enWidth = MeasureText("N").Size.Width;
-
 			FontMetrics = new FontMetrics(
 				lineHeight: Math.Abs(font.Metrics.Ascent) + Math.Abs(font.Metrics.Descent) + Math.Abs(font.Metrics.Leading),
 				ascent: font.Metrics.Ascent,
@@ -30,9 +27,9 @@ namespace Onyx.Windows.Rendering
 				strikethroughPosition: font.Metrics.StrikeoutPosition ?? font.Metrics.XHeight - 1,
 				overlinePosition: font.Metrics.Ascent,
 
-				emWidth: emWidth,
-				enWidth: enWidth,
-				exHeight: font.Metrics.XHeight
+				em: MeasureText("M").Size,
+				en: MeasureText("N").Size,
+				ex: MeasureText("x").Size
 			);
 		}
 
@@ -88,9 +85,8 @@ namespace Onyx.Windows.Rendering
 			float advance = Font.MeasureText(text, out SKRect bounds);
 
 			return new TextMetrics(
-				new Size2d(bounds.Width, bounds.Height),
-				new Vector2d(advance, 0),
-				new Rect2d(bounds.Left, bounds.Top, bounds.Width, bounds.Height)
+				new Rect2d(bounds.Left, bounds.Top, bounds.Width, bounds.Height),
+				new Vector2d(advance, 0)
 			);
 		}
 	}

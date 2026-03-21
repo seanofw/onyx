@@ -4,7 +4,7 @@ using Onyx.Css.Types;
 using Onyx.Html.Dom;
 using Onyx.Rendering;
 using Onyx.Types;
-using Onyx.Windows.Rendering;
+using Onyx.Skia;
 using SkiaSharp;
 
 namespace Onyx.Windows

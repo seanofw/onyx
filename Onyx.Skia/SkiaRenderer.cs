@@ -5,7 +5,7 @@ using Onyx.Rendering;
 using Onyx.Types;
 using SkiaSharp;
 
-namespace Onyx.Windows.Rendering
+namespace Onyx.Skia
 {
 	public class SkiaRenderer : IRenderer, IRenderables, IDisposable
 	{

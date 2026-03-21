@@ -1,6 +1,6 @@
-namespace Onyx.Windows.Rendering
+namespace Onyx.Skia
 {
-	internal abstract class SkiaDisposable : IDisposable
+	public abstract class SkiaDisposable : IDisposable
 	{
 		~SkiaDisposable()
 		{
