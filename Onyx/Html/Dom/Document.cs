@@ -96,15 +96,6 @@ namespace Onyx.Html.Dom
 		public IStyleQueue StyleQueue => _styleQueue;
 		private readonly StyleQueue _styleQueue = new StyleQueue();
 
-		public IBoxQueue MeasureQueue => _measureQueue;
-		private readonly BoxQueue _measureQueue = new BoxQueue();
-
-		public IBoxQueue ArrangeQueue => _arrangeQueue;
-		private readonly BoxQueue _arrangeQueue = new BoxQueue();
-
-		public IBoxQueue PaintQueue => _paintQueue;
-		private readonly BoxQueue _paintQueue = new BoxQueue();
-
 		public Document(string? content = null)
 		{
 			Root = this;
@@ -180,10 +171,6 @@ namespace Onyx.Html.Dom
 
 		protected virtual void OnViewportChanged()
 		{
-			if (Box != null)
-			{
-				Box.Flags |= BoxFlags.NeedsArrange;
-			}
 		}
 	}
 }

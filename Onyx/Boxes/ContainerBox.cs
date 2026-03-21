@@ -1,3 +1,6 @@
+using Onyx.Css.Computed;
+using Onyx.Html.Dom;
+
 namespace Onyx.Boxes
 {
 	/// <summary>
@@ -5,15 +8,10 @@ namespace Onyx.Boxes
 	/// </summary>
 	public abstract class ContainerBox : Box
 	{
-		/// <summary>
-		/// The collection of children.
-		/// </summary>
-		public IReadOnlyList<Box> Children => _children;
-		private List<Box> _children = new List<Box>();
-
-		/// <summary>
-		/// The collection of children, as a mutable data structure.
-		/// </summary>
-		internal List<Box> ChildrenMutable => _children;
+		protected ContainerBox(BoxKind kind, Element element, ComputedStyle computedStyle,
+			IEnumerable<Box> children)
+			: base(kind, element, computedStyle, children)
+		{
+		}
 	}
 }
