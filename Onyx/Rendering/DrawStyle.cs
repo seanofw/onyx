@@ -98,7 +98,7 @@ namespace Onyx.Rendering
 			IBrush? brush = null,
 			Rect2d brushRect = default,
 			double lineThickness = 0.0,
-			LineStyle lineStyle = default,
+			LineStyle? lineStyle = default,
 			Matrix3x2d transform = default)
 		{
 			Clip = clip;
@@ -108,7 +108,7 @@ namespace Onyx.Rendering
 			Brush = color.HasValue ? null : brush;
 			BrushRect = brushRect;
 			LineThickness = lineThickness;
-			LineStyle = lineStyle;
+			LineStyle = lineStyle ?? LineStyle.Solid;
 			Transform = transform;
 		}
 

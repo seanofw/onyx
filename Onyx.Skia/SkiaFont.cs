@@ -29,7 +29,8 @@ namespace Onyx.Skia
 
 				em: MeasureText("M").Size,
 				en: MeasureText("N").Size,
-				ex: MeasureText("x").Size
+				ex: MeasureText("x").Size,
+				space: MeasureText(" ").Size.Width
 			);
 		}
 

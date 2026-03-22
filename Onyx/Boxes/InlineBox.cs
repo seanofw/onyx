@@ -23,19 +23,19 @@ namespace Onyx.Boxes
 			Align = textAlign;
 		}
 
-		protected override Size2d MeasureInternal(Size2d availableSize)
-		{
-			Size2d measuredSize = new Size2d(0, 0);
+		//protected override Size2d MeasureInternal(Size2d availableSize)
+		//{
+		//	Size2d measuredSize = new Size2d(0, 0);
 
-			foreach (Box child in Children)
-			{
-				Size2d childSize = child.Measure(availableSize);
-				measuredSize = new Size2d(measuredSize.Width + childSize.Width,
-					Math.Max(measuredSize.Height, childSize.Height));
-			}
+		//	foreach (Box child in Children)
+		//	{
+		//		Size2d childSize = child.Measure(availableSize);
+		//		measuredSize = new Size2d(measuredSize.Width + childSize.Width,
+		//			Math.Max(measuredSize.Height, childSize.Height));
+		//	}
 
-			return measuredSize;
-		}
+		//	return measuredSize;
+		//}
 
 		protected override void ArrangeInternal(Rect2d containerRect)
 		{
