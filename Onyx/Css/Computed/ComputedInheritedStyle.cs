@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
@@ -53,5 +54,23 @@ namespace Onyx.Css.Computed
 			=> new ComputedInheritedStyle(Text, Font, Table, List, misc, Visibility);
 		public ComputedInheritedStyle WithVisibility(VisibilityKind visibility)
 			=> new ComputedInheritedStyle(Text, Font, Table, List, Misc, visibility);
+
+		public UInt256 Diff(ComputedInheritedStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+			bits |= Text.Diff(other.Text);
+			bits |= Font.Diff(other.Font);
+			bits |= Table.Diff(other.Table);
+			bits |= List.Diff(other.List);
+			bits |= Misc.Diff(other.Misc);
+			
+			if (Visibility != other.Visibility)
+				bits = bits.SetBit((int)KnownPropertyKind.Visibility);
+
+			return bits;
+		}
 	}
 }

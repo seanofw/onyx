@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
@@ -74,5 +75,34 @@ namespace Onyx.Css.Computed
 		public ComputedFlexStyle WithOrder(int order)
 			=> new ComputedFlexStyle(Direction, Wrap, AlignContent,
 				AlignItems, AlignSelf, JustifyContent, Basis, Grow, Shrink, order);
+
+		public UInt256 Diff(ComputedFlexStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+			if (Direction != other.Direction)
+				bits = bits.SetBit((int)KnownPropertyKind.Direction);
+			if (Wrap != other.Wrap)
+				bits = bits.SetBit((int)KnownPropertyKind.FlexWrap);
+			if (AlignContent != other.AlignContent)
+				bits = bits.SetBit((int)KnownPropertyKind.AlignContent);
+			if (AlignItems != other.AlignItems)
+				bits = bits.SetBit((int)KnownPropertyKind.AlignItems);
+			if (AlignSelf != other.AlignSelf)
+				bits = bits.SetBit((int)KnownPropertyKind.AlignSelf);
+			if (JustifyContent != other.JustifyContent)
+				bits = bits.SetBit((int)KnownPropertyKind.JustifyContent);
+			if (Basis != other.Basis)
+				bits = bits.SetBit((int)KnownPropertyKind.FlexBasis);
+			if (Grow != other.Grow)
+				bits = bits.SetBit((int)KnownPropertyKind.FlexGrow);
+			if (Shrink != other.Shrink)
+				bits = bits.SetBit((int)KnownPropertyKind.FlexShrink);
+			if (Order != other.Order)
+				bits = bits.SetBit((int)KnownPropertyKind.Order);
+			return bits;
+		}
 	}
 }

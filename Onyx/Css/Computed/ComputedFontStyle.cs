@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 using Onyx.Types;
 
@@ -59,5 +60,47 @@ namespace Onyx.Css.Computed
 			=> new ComputedFontStyle(Families, SpecialFont, Size, Style, Weight, Variant, color, TextShadows);
 		public ComputedFontStyle WithTextShadows(IEnumerable<Shadow>? textShadows)
 			=> new ComputedFontStyle(Families, SpecialFont, Size, Style, Weight, Variant, Color, textShadows);
+
+		public UInt256 Diff(ComputedFontStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+
+			if (Color != other.Color)
+				bits = bits.SetBit((int)KnownPropertyKind.Color);
+
+			if (Families.Count != other.Families.Count)
+				bits = bits.SetBit((int)KnownPropertyKind.FontFamily);
+			else
+			{
+				for (int i = 0; i < Families.Count; i++)
+					if (!Families[i].Equals(other.Families[i]))
+						bits = bits.SetBit((int)KnownPropertyKind.FontFamily);
+			}
+
+			if (SpecialFont != other.SpecialFont)
+				bits = bits.SetBit((int)KnownPropertyKind.SpecialFont);
+			if (Size != other.Size)
+				bits = bits.SetBit((int)KnownPropertyKind.FontSize);
+			if (Style != other.Style)
+				bits = bits.SetBit((int)KnownPropertyKind.FontStyle);
+			if (Weight != other.Weight)
+				bits = bits.SetBit((int)KnownPropertyKind.FontWeight);
+			if (Variant != other.Variant)
+				bits = bits.SetBit((int)KnownPropertyKind.FontVariant);
+
+			if (TextShadows.Count != other.TextShadows.Count)
+				bits = bits.SetBit((int)KnownPropertyKind.TextShadow);
+			else
+			{
+				for (int i = 0; i < TextShadows.Count; i++)
+					if (!TextShadows[i].Equals(other.TextShadows[i]))
+						bits = bits.SetBit((int)KnownPropertyKind.TextShadow);
+			}
+
+			return bits;
+		}
 	}
 }

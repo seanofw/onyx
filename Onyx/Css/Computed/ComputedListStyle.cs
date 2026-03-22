@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
@@ -26,5 +27,20 @@ namespace Onyx.Css.Computed
 			=> new ComputedListStyle(Uri, position, Type);
 		public ComputedListStyle WithType(ListStyleType type)
 			=> new ComputedListStyle(Uri, Position, type);
+
+		public UInt256 Diff(ComputedListStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+			if (Uri != other.Uri)
+				bits = bits.SetBit((int)KnownPropertyKind.ListStyleImage);
+			if (Position != other.Position)
+				bits = bits.SetBit((int)KnownPropertyKind.ListStylePosition);
+			if (Type != other.Type)
+				bits = bits.SetBit((int)KnownPropertyKind.ListStyleType);
+			return bits;
+		}
 	}
 }

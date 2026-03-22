@@ -1,4 +1,5 @@
-﻿using Onyx.Css.Types;
+using Onyx.Css.Properties;
+using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
 {
@@ -114,5 +115,55 @@ namespace Onyx.Css.Computed
 			=> new ComputedSizes(_sizeConstraints, _offset, _padding, _margin.WithBottom(marginBottom));
 		public ComputedSizes WithMarginRight(Measure marginRight)
 			=> new ComputedSizes(_sizeConstraints, _offset, _padding, _margin.WithRight(marginRight));
+
+		public UInt256 Diff(ComputedSizes other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+
+			if (Width != other.Width)
+				bits = bits.SetBit((int)KnownPropertyKind.Width);
+			if (Height != other.Height)
+				bits = bits.SetBit((int)KnownPropertyKind.Height);
+			if (MinWidth != other.MinWidth)
+				bits = bits.SetBit((int)KnownPropertyKind.MinWidth);
+			if (MinHeight != other.MinHeight)
+				bits = bits.SetBit((int)KnownPropertyKind.MinHeight);
+			if (MaxWidth != other.MaxWidth)
+				bits = bits.SetBit((int)KnownPropertyKind.MaxWidth);
+			if (MaxHeight != other.MaxHeight)
+				bits = bits.SetBit((int)KnownPropertyKind.MaxHeight);
+
+			if (Left != other.Left)
+				bits = bits.SetBit((int)KnownPropertyKind.Left);
+			if (Top != other.Top)
+				bits = bits.SetBit((int)KnownPropertyKind.Top);
+			if (Right != other.Right)
+				bits = bits.SetBit((int)KnownPropertyKind.Right);
+			if (Bottom != other.Bottom)
+				bits = bits.SetBit((int)KnownPropertyKind.Bottom);
+
+			if (PaddingLeft != other.PaddingLeft)
+				bits = bits.SetBit((int)KnownPropertyKind.PaddingLeft);
+			if (PaddingTop != other.PaddingTop)
+				bits = bits.SetBit((int)KnownPropertyKind.PaddingTop);
+			if (PaddingRight != other.PaddingRight)
+				bits = bits.SetBit((int)KnownPropertyKind.PaddingRight);
+			if (PaddingBottom != other.PaddingBottom)
+				bits = bits.SetBit((int)KnownPropertyKind.PaddingBottom);
+
+			if (MarginLeft != other.MarginLeft)
+				bits = bits.SetBit((int)KnownPropertyKind.MarginLeft);
+			if (MarginTop != other.MarginTop)
+				bits = bits.SetBit((int)KnownPropertyKind.MarginTop);
+			if (MarginRight != other.MarginRight)
+				bits = bits.SetBit((int)KnownPropertyKind.MarginRight);
+			if (MarginBottom != other.MarginBottom)
+				bits = bits.SetBit((int)KnownPropertyKind.MarginBottom);
+
+			return bits;
+		}
 	}
 }

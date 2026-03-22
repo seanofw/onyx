@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 using Onyx.Types;
 
@@ -97,5 +98,19 @@ namespace Onyx.Css.Computed
 		public ComputedBorderStyle WithBottomRightRadius(Measure bottomRight)
 			=> new ComputedBorderStyle(Top, Right, Bottom, Left,
 				_corner.WithBottomRight(bottomRight));
+
+		public UInt256 Diff(ComputedBorderStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+			bits |= Top.Diff(other.Top, KnownPropertyKind.BorderTopStyle, KnownPropertyKind.BorderTopColor, KnownPropertyKind.BorderTopWidth);
+			bits |= Right.Diff(other.Right, KnownPropertyKind.BorderRightStyle, KnownPropertyKind.BorderRightColor, KnownPropertyKind.BorderRightWidth);
+			bits |= Bottom.Diff(other.Bottom, KnownPropertyKind.BorderBottomStyle, KnownPropertyKind.BorderBottomColor, KnownPropertyKind.BorderBottomWidth);
+			bits |= Left.Diff(other.Left, KnownPropertyKind.BorderLeftStyle, KnownPropertyKind.BorderLeftColor, KnownPropertyKind.BorderLeftWidth);
+			bits |= _corner.Diff(other._corner);
+			return bits;
+		}
 	}
 }

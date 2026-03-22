@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
@@ -42,5 +43,26 @@ namespace Onyx.Css.Computed
 			=> new ComputedBackgroundLayer(Attachment, Origin, Repeat, Position, size, Layer);
 		public ComputedBackgroundLayer WithLayer(BackgroundLayerBase? layer)
 			=> new ComputedBackgroundLayer(Attachment, Origin, Repeat, Position, Size, layer);
+
+		public UInt256 Diff(ComputedBackgroundLayer other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+			if (Attachment != other.Attachment)
+				bits = bits.SetBit((int)KnownPropertyKind.BackgroundAttachment);
+			if (Origin != other.Origin)
+				bits = bits.SetBit((int)KnownPropertyKind.BackgroundOrigin);
+			if (Repeat != other.Repeat)
+				bits = bits.SetBit((int)KnownPropertyKind.BackgroundRepeat);
+			if (!Position.Equals(other.Position))
+				bits = bits.SetBit((int)KnownPropertyKind.BackgroundPosition);
+			if (!Size.Equals(other.Size))
+				bits = bits.SetBit((int)KnownPropertyKind.BackgroundSize);
+			if (Layer != other.Layer)
+				bits = bits.SetBit((int)KnownPropertyKind.BackgroundImage);
+			return bits;
+		}
 	}
 }

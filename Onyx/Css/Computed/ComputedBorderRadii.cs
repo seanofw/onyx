@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
@@ -30,5 +31,22 @@ namespace Onyx.Css.Computed
 			=> new ComputedBorderRadii(TopLeft, TopRight, bottomLeft, BottomRight);
 		public ComputedBorderRadii WithBottomRight(Measure bottomRight)
 			=> new ComputedBorderRadii(TopLeft, TopRight, BottomLeft, bottomRight);
+
+		public UInt256 Diff(ComputedBorderRadii other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+			if (TopLeft != other.TopLeft)
+				bits = bits.SetBit((int)KnownPropertyKind.BorderTopLeftRadius);
+			if (TopRight != other.TopRight)
+				bits = bits.SetBit((int)KnownPropertyKind.BorderTopRightRadius);
+			if (BottomRight != other.BottomRight)
+				bits = bits.SetBit((int)KnownPropertyKind.BorderBottomRightRadius);
+			if (BottomLeft != other.BottomLeft)
+				bits = bits.SetBit((int)KnownPropertyKind.BorderBottomLeftRadius);
+			return bits;
+		}
 	}
 }

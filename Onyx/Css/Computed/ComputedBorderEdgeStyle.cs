@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 using Onyx.Types;
 
@@ -32,5 +33,19 @@ namespace Onyx.Css.Computed
 			=> new ComputedBorderEdgeStyle(Style, color, Width);
 		public ComputedBorderEdgeStyle WithWidth(Measure width)
 			=> new ComputedBorderEdgeStyle(Style, Color, width);
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public UInt256 Diff(ComputedBorderEdgeStyle other,
+			KnownPropertyKind style, KnownPropertyKind color, KnownPropertyKind width)
+		{
+			UInt256 bits = default;
+			if (Style != other.Style)
+				bits = bits.SetBit((int)style);
+			if (Color != other.Color)
+				bits = bits.SetBit((int)color);
+			if (Width != other.Width)
+				bits = bits.SetBit((int)width);
+			return bits;
+		}
 	}
 }

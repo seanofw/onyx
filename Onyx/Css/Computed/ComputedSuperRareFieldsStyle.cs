@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
@@ -56,5 +57,53 @@ namespace Onyx.Css.Computed
 		public ComputedSuperRareFieldsStyle WithCounterResets(IEnumerable<Counter>? counterResets)
 			=> new ComputedSuperRareFieldsStyle(Clip, ContentPieces, VerticalAlignLength, CounterIncrements, counterResets);
 
+		public UInt256 Diff(ComputedSuperRareFieldsStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+
+			if (Clip != other.Clip)
+				bits = bits.SetBit((int)KnownPropertyKind.Clip);
+
+			if (ContentPieces.Count != other.ContentPieces.Count)
+			{
+				bits = bits.SetBit((int)KnownPropertyKind.Content);
+			}
+			else
+			{
+				for (int i = 0; i < ContentPieces.Count; i++)
+					if (ContentPieces[i] != other.ContentPieces[i])
+						bits = bits.SetBit((int)KnownPropertyKind.Content);
+			}
+
+			if (VerticalAlignLength != other.VerticalAlignLength)
+				bits = bits.SetBit((int)KnownPropertyKind.VerticalAlign);
+
+			if (CounterIncrements.Count != other.CounterIncrements.Count)
+			{
+				bits = bits.SetBit((int)KnownPropertyKind.CounterIncrement);
+			}
+			else
+			{
+				for (int i = 0; i < CounterIncrements.Count; i++)
+					if (CounterIncrements[i] != other.CounterIncrements[i])
+						bits = bits.SetBit((int)KnownPropertyKind.CounterIncrement);
+			}
+
+			if (CounterResets.Count != other.CounterResets.Count)
+			{
+				bits = bits.SetBit((int)KnownPropertyKind.CounterReset);
+			}
+			else
+			{
+				for (int i = 0; i < CounterResets.Count; i++)
+					if (CounterResets[i] != other.CounterResets[i])
+						bits = bits.SetBit((int)KnownPropertyKind.CounterReset);
+			}
+
+			return bits;
+		}
 	}
 }

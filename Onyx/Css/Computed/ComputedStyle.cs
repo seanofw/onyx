@@ -16,7 +16,8 @@ namespace Onyx.Css.Computed
 		internal readonly ComputedBorderStyle Border;
 		internal readonly ComputedInheritedStyle Inherited;
 		internal readonly ComputedRareFieldsStyle RareFields;
-		internal readonly UInt256 AssignedPropertyBits;
+
+		public readonly UInt256 AssignedPropertyBits;
 		private KnownPropertyKind[]? _assignedProperties;
 
 		internal ComputedFlexStyle Flex => RareFields.Flex;
@@ -37,7 +38,7 @@ namespace Onyx.Css.Computed
 		/// only a few machine instructions and no allocations.
 		/// </summary>
 		public IReadOnlyList<KnownPropertyKind> AssignedProperties
-			=> _assignedProperties ??= GenerateAssignedPropertiesArray(AssignedPropertyBits);
+			=> _assignedProperties ??= ConvertBitsToKnownProperties(AssignedPropertyBits);
 
 		/// <summary>
 		/// Test to see if a specific property was assigned as part of this computed style.
@@ -630,29 +631,67 @@ namespace Onyx.Css.Computed
 			=> WithEnums(Enums.WithUnicodeBidi(unicodeBidi), KnownPropertyKind.UnicodeBidi);
 
 		/// <summary>
-		/// Generate the array of AssignedProperties, on demand.
+		/// Convert a set of bits where each bit represents a KnownPropertyKind enum
+		/// value into an actual array of KnownPropertyKind values.
 		/// </summary>
-		/// <param name="assignedPropertyBits">The set of bits describing
-		/// which properties were assigned and which were not.</param>
+		/// <param name="bits">The set of bits describing which properties are included and which are not.</param>
 		/// <returns>An array of KnownPropertyKind enum values.</returns>
-		private static KnownPropertyKind[] GenerateAssignedPropertiesArray(UInt256 assignedPropertyBits)
+		public static KnownPropertyKind[] ConvertBitsToKnownProperties(UInt256 bits)
 		{
-			if (assignedPropertyBits.IsZero)
+			if (bits.IsZero)
 				return Array.Empty<KnownPropertyKind>();
 
-			KnownPropertyKind[] kinds = new KnownPropertyKind[assignedPropertyBits.PopCount()];
+			KnownPropertyKind[] kinds = new KnownPropertyKind[bits.PopCount()];
 
-			int start = assignedPropertyBits.TrailingZeroCount();
-			int end = 256 - assignedPropertyBits.LeadingZeroCount();
+			int start = bits.TrailingZeroCount();
+			int end = 256 - bits.LeadingZeroCount();
 
 			int dest = 0;
 			for (int i = start; i < end; i++)
 			{
-				if (assignedPropertyBits.IsBitSet(i))
+				if (bits.IsBitSet(i))
 					kinds[dest++] = (KnownPropertyKind)i;
 			}
 
 			return kinds;
+		}
+
+		/// <summary>
+		/// Convert a collection of KnownPropertyKind enum values to a compact bit set
+		/// representing those same enum values.
+		/// </summary>
+		/// <param name="kinds">The set of property kinds.</param>
+		/// <returns>A bit set that represents that same set.</returns>
+		public static UInt256 ConvertKnownPropertiesToBits(IEnumerable<KnownPropertyKind> kinds)
+		{
+			UInt256 bits = default;
+			foreach (KnownPropertyKind kind in kinds)
+				bits = bits.SetBit((int)kind);
+			return bits;
+		}
+
+		/// <summary>
+		/// Compare this style to another, and indicate which properties, if any, are
+		/// different by adding their KnownPropertyKind(s) to the provided changes collection.
+		/// This does a proper deep comparison:  Every property value is tested (but subtrees
+		/// are compared by pointer where possible to make it as efficient as possible).
+		/// </summary>
+		/// <param name="other">The other style to compare to.</param>
+		/// <returns>A bit collection that describes which properties have changed, where
+		/// each bit position represents an entry in the KnownPropertyKind enum.</param>
+		public UInt256 Diff(ComputedStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+			bits |= Enums.Diff(other.Enums);
+			bits |= Sizes.Diff(other.Sizes);
+			bits |= Background.Diff(other.Background);
+			bits |= Border.Diff(other.Border);
+			bits |= Inherited.Diff(other.Inherited);
+			bits |= RareFields.Diff(other.RareFields);
+			return bits;
 		}
 
 		/// <summary>

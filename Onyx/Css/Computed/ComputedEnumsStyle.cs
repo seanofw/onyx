@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
@@ -116,5 +117,38 @@ namespace Onyx.Css.Computed
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public ComputedEnumsStyle WithTextDecoration(TextDecorationLineKind textDecoration)
 			=> new ComputedEnumsStyle(((ulong)textDecoration << TextDecorationOffset) | (_value & ~(0xFUL << TextDecorationOffset)));
+
+		public UInt256 Diff(ComputedEnumsStyle other)
+		{
+			if (_value == other._value)
+				return default;
+
+			UInt256 bits = default;
+			if (Display != other.Display)
+				bits = bits.SetBit((int)KnownPropertyKind.Display);
+			if (Position != other.Position)
+				bits = bits.SetBit((int)KnownPropertyKind.Position);
+			if (Clear != other.Clear)
+				bits = bits.SetBit((int)KnownPropertyKind.Clear);
+			if (Float != other.Float)
+				bits = bits.SetBit((int)KnownPropertyKind.Float);
+			if (Resize != other.Resize)
+				bits = bits.SetBit((int)KnownPropertyKind.Resize);
+			if (BoxSizing != other.BoxSizing)
+				bits = bits.SetBit((int)KnownPropertyKind.BoxSizing);
+			if (OverflowX != other.OverflowX)
+				bits = bits.SetBit((int)KnownPropertyKind.OverflowX);
+			if (OverflowY != other.OverflowY)
+				bits = bits.SetBit((int)KnownPropertyKind.OverflowY);
+			if (TableLayout != other.TableLayout)
+				bits = bits.SetBit((int)KnownPropertyKind.TableLayout);
+			if (VerticalAlign != other.VerticalAlign)
+				bits = bits.SetBit((int)KnownPropertyKind.VerticalAlign);
+			if (UnicodeBidi != other.UnicodeBidi)
+				bits = bits.SetBit((int)KnownPropertyKind.UnicodeBidi);
+			if (TextDecoration != other.TextDecoration)
+				bits = bits.SetBit((int)KnownPropertyKind.TextDecoration);
+			return bits;
+		}
 	}
 }

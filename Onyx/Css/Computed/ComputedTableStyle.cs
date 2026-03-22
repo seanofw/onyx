@@ -1,4 +1,5 @@
-﻿using Onyx.Css.Types;
+using Onyx.Css.Properties;
+using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
 {
@@ -37,5 +38,22 @@ public class ComputedTableStyle : IDefaultInheritedStyle
 			=> new ComputedTableStyle(BorderCollapse, BorderSpacingX, BorderSpacingY, emptyCells, CaptionSide);
 		public ComputedTableStyle WithCaptionSide(CaptionSide captionSide)
 			=> new ComputedTableStyle(BorderCollapse, BorderSpacingX, BorderSpacingY, EmptyCells, captionSide);
+
+		public UInt256 Diff(ComputedTableStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+			if (BorderCollapse != other.BorderCollapse)
+				bits = bits.SetBit((int)KnownPropertyKind.BorderCollapse);
+			if (BorderSpacingX != other.BorderSpacingX || BorderSpacingY != BorderSpacingY)
+				bits = bits.SetBit((int)KnownPropertyKind.BorderSpacing);
+			if (EmptyCells != other.EmptyCells)
+				bits = bits.SetBit((int)KnownPropertyKind.EmptyCells);
+			if (CaptionSide != other.CaptionSide)
+				bits = bits.SetBit((int)KnownPropertyKind.CaptionSide);
+			return bits;
+		}
 	}
 }

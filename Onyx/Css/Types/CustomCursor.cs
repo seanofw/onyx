@@ -1,10 +1,9 @@
-﻿using System;
 using System.Globalization;
 using Onyx.Extensions;
 
 namespace Onyx.Css.Types
 {
-	public class CustomCursor
+	public class CustomCursor : IEquatable<CustomCursor>
 	{
 		public string Uri { get; }
 		public double HotspotX { get; }
@@ -32,6 +31,19 @@ namespace Onyx.Css.Types
 			=> new CustomCursor(Uri, hotspotX, HotspotY);
 		public CustomCursor WithHotspotY(double hotspotY)
 			=> new CustomCursor(Uri, HotspotX, hotspotY);
+
+		public override bool Equals(object? obj)
+			=> obj is CustomCursor other && Equals(other);
+		public bool Equals(CustomCursor? other)
+			=> ReferenceEquals(other, this) ? true
+				: ReferenceEquals(other, null) ? false
+				: Uri == other.Uri && HotspotX == other.HotspotX && HotspotY == other.HotspotY;
+		public override int GetHashCode()
+			=> unchecked(((Uri.GetHashCode() * 65599) + HotspotX.GetHashCode()) * 65599 + HotspotY.GetHashCode());
+		public static bool operator ==(CustomCursor? left, CustomCursor? right)
+			=> ReferenceEquals(left, null) ? ReferenceEquals(right, null) : left.Equals(right);
+		public static bool operator !=(CustomCursor? left, CustomCursor? right)
+			=> ReferenceEquals(left, null) ? !ReferenceEquals(right, null) : !left.Equals(right);
 
 		public override string ToString()
 			=> "url(\"" + Uri.ToString().AddCSlashes()

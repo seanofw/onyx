@@ -1,4 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
+using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
 {
@@ -36,5 +38,23 @@ namespace Onyx.Css.Computed
 			=> new ComputedRareFieldsStyle(Flex, PageBreak, Outline, superRare, ZIndex);
 		public ComputedRareFieldsStyle WithZIndex(int zindex)
 			=> new ComputedRareFieldsStyle(Flex, PageBreak, Outline, SuperRare, zindex);
+
+		public UInt256 Diff(ComputedRareFieldsStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+
+			bits |= Flex.Diff(other.Flex);
+			bits |= PageBreak.Diff(other.PageBreak);
+			bits |= Outline.Diff(other.Outline);
+			bits |= SuperRare.Diff(other.SuperRare);
+
+			if (ZIndex != other.ZIndex)
+				bits = bits.SetBit((int)KnownPropertyKind.ZIndex);
+
+			return bits;
+		}
 	}
 }

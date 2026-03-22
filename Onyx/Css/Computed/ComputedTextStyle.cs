@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
@@ -75,5 +76,33 @@ namespace Onyx.Css.Computed
 		public ComputedTextStyle WithLineHeight(Measure lineHeight)
 			=> new ComputedTextStyle(TextAlign, Direction, TextTransform, WhiteSpace,
 				WordSpacing, TextIndent, LetterSpacing, lineHeight);
+
+		public UInt256 Diff(ComputedTextStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+
+			if (TextAlign != other.TextAlign)
+				bits = bits.SetBit((int)KnownPropertyKind.TextAlign);
+			if (Direction != other.Direction)
+				bits = bits.SetBit((int)KnownPropertyKind.Direction);
+			if (TextTransform != other.TextTransform)
+				bits = bits.SetBit((int)KnownPropertyKind.TextTransform);
+			if (WhiteSpace != other.WhiteSpace)
+				bits = bits.SetBit((int)KnownPropertyKind.WhiteSpace);
+
+			if (WordSpacing != other.WordSpacing)
+				bits = bits.SetBit((int)KnownPropertyKind.WordSpacing);
+			if (TextIndent != other.TextIndent)
+				bits = bits.SetBit((int)KnownPropertyKind.TextIndent);
+			if (LetterSpacing != other.LetterSpacing)
+				bits = bits.SetBit((int)KnownPropertyKind.LetterSpacing);
+			if (LineHeight != other.LineHeight)
+				bits = bits.SetBit((int)KnownPropertyKind.LineHeight);
+
+			return bits;
+		}
 	}
 }

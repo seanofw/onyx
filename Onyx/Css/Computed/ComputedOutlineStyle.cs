@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 using Onyx.Types;
 
@@ -47,5 +48,22 @@ namespace Onyx.Css.Computed
 			=> new ComputedOutlineStyle(Color, Invert, Offset, width, Style);
 		public ComputedOutlineStyle WithStyle(BorderStyle style)
 			=> new ComputedOutlineStyle(Color, Invert, Offset, Width, style);
+
+		public UInt256 Diff(ComputedOutlineStyle other)
+		{
+			if (this == other)
+				return default;
+
+			UInt256 bits = default;
+			if (Color != other.Color || _invert != other._invert)
+				bits = bits.SetBit((int)KnownPropertyKind.OutlineColor);
+			if (Offset != other.Offset)
+				bits = bits.SetBit((int)KnownPropertyKind.OutlineOffset);
+			if (Width != other.Width)
+				bits = bits.SetBit((int)KnownPropertyKind.OutlineWidth);
+			if (Style != other.Style)
+				bits = bits.SetBit((int)KnownPropertyKind.OutlineStyle);
+			return bits;
+		}
 	}
 }

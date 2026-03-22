@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
+using Onyx.Css.Properties;
 using Onyx.Css.Types;
 
 namespace Onyx.Css.Computed
@@ -26,5 +27,17 @@ namespace Onyx.Css.Computed
 			=> new ComputedPageBreakStyle(BreakBefore, breakAfter, BreakInside);
 		public ComputedPageBreakStyle WithBreakInside(PageBreakInsideOption breakInside)
 			=> new ComputedPageBreakStyle(BreakBefore, BreakAfter, breakInside);
+
+		public UInt256 Diff(ComputedPageBreakStyle other)
+		{
+			UInt256 bits = default;
+			if (BreakBefore != other.BreakBefore)
+				bits = bits.SetBit((int)KnownPropertyKind.PageBreakBefore);
+			if (BreakAfter != other.BreakAfter)
+				bits = bits.SetBit((int)KnownPropertyKind.PageBreakAfter);
+			if (BreakInside != other.BreakInside)
+				bits = bits.SetBit((int)KnownPropertyKind.PageBreakInside);
+			return bits;
+		}
 	}
 }
