@@ -27,6 +27,10 @@ namespace Onyx.Css.Properties
 			=> new DoubleSyntax<TProp>(constructor);
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public Syntax<TProp> Percent(Func<TProp, double, TProp> constructor)
+			=> new PercentSyntax<TProp>(constructor);
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public Syntax<TProp> Punct(CssTokenKind kind, Func<TProp, CssToken, TProp>? constructor = null)
 			=> new PunctSyntax<TProp>([kind], constructor);
 

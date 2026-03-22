@@ -1,4 +1,4 @@
-﻿namespace Onyx.Css.Properties
+namespace Onyx.Css.Properties
 {
 	public enum KnownPropertyKind : ushort
 	{
@@ -109,6 +109,7 @@
 		MinHeight,
 		MinWidth,
 
+		Opacity,
 		Order,
 		Orphans,
 

@@ -1,4 +1,4 @@
-﻿using Onyx.Css.Parsing;
+using Onyx.Css.Parsing;
 using Onyx.Css.Properties.KnownProperties;
 using Onyx.Css.Types;
 
@@ -575,6 +575,16 @@ namespace Onyx.Css.Properties
 				{ KnownPropertyKind.MarginTop, MakeWidthProperty<MarginTopProperty>() },
 				{ KnownPropertyKind.MarginBottom, MakeWidthProperty<MarginBottomProperty>() },
 				{ KnownPropertyKind.Margin, MakeWidthMultiProperty<MarginProperty>() },
+
+				{ KnownPropertyKind.Opacity,
+					// <double>
+					DefineSyntax<OpacityProperty>(x =>
+						x.OneOf(
+							x.Double((p, d) => p with { Opacity = d }),
+							x.Percent((p, d) => p with { Opacity = d * 0.01 })
+						)
+					)
+				},
 
 				{ KnownPropertyKind.Orphans,
 					// <integer>
