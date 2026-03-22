@@ -16,7 +16,8 @@ namespace Onyx.Css.Computed
 		internal readonly ComputedBorderStyle Border;
 		internal readonly ComputedInheritedStyle Inherited;
 		internal readonly ComputedRareFieldsStyle RareFields;
-		public readonly UInt256 AssignedPropertyBits;
+		internal readonly UInt256 AssignedPropertyBits;
+		private KnownPropertyKind[]? _assignedProperties;
 
 		internal ComputedFlexStyle Flex => RareFields.Flex;
 		internal ComputedPageBreakStyle PageBreak => RareFields.PageBreak;
@@ -28,14 +29,36 @@ namespace Onyx.Css.Computed
 		internal ComputedMiscInheritedStyle MiscInherited => Inherited.Misc;
 		internal ComputedSuperRareFieldsStyle SuperRare => RareFields.SuperRare;
 
-		public IEnumerable<KnownPropertyKind> AssignedProperties
+		/// <summary>
+		/// The list of KnownPropertyKinds that were assigned as part of this computed style.
+		/// This list is available for reference, but prefer IsPropertyAssigned() and
+		/// AnyPropertiesAssigned() for testing, as those work without allocating and
+		/// constructing an actual list: IsPropertyAssigned() executes in O(1) time with
+		/// only a few machine instructions and no allocations.
+		/// </summary>
+		public IReadOnlyList<KnownPropertyKind> AssignedProperties
+			=> _assignedProperties ??= GenerateAssignedPropertiesArray(AssignedPropertyBits);
+
+		/// <summary>
+		/// Test to see if a specific property was assigned as part of this computed style.
+		/// </summary>
+		/// <param name="kind">The type of property to test.</param>
+		/// <returns>True if that property was assigned in this computed style, false if it was not.</returns>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public bool IsPropertyAssigned(KnownPropertyKind kind)
+			=> AssignedPropertyBits.IsBitSet((int)kind);
+
+		/// <summary>
+		/// Test to see if any of the given properties were assigned as part of this computed style.
+		/// </summary>
+		/// <param name="kind">The type of property to test.</param>
+		/// <returns>True if any of the given properties were assigned in this computed style, false if none were.</returns>
+		public bool AnyPropertiesAssigned(params KnownPropertyKind[] kinds)
 		{
-			get
-			{
-				for (int i = 0; i < 256; i++)
-					if (AssignedPropertyBits.IsBitSet(i))
-						yield return (KnownPropertyKind)i;
-			}
+			foreach (KnownPropertyKind kind in kinds)
+				if (AssignedPropertyBits.IsBitSet((int)kind))
+					return true;
+			return false;
 		}
 
 		// Common enums
@@ -605,6 +628,32 @@ namespace Onyx.Css.Computed
 		}
 		public ComputedStyle WithUnicodeBidi(UnicodeBidi unicodeBidi)
 			=> WithEnums(Enums.WithUnicodeBidi(unicodeBidi), KnownPropertyKind.UnicodeBidi);
+
+		/// <summary>
+		/// Generate the array of AssignedProperties, on demand.
+		/// </summary>
+		/// <param name="assignedPropertyBits">The set of bits describing
+		/// which properties were assigned and which were not.</param>
+		/// <returns>An array of KnownPropertyKind enum values.</returns>
+		private static KnownPropertyKind[] GenerateAssignedPropertiesArray(UInt256 assignedPropertyBits)
+		{
+			if (assignedPropertyBits.IsZero)
+				return Array.Empty<KnownPropertyKind>();
+
+			KnownPropertyKind[] kinds = new KnownPropertyKind[assignedPropertyBits.PopCount()];
+
+			int start = assignedPropertyBits.TrailingZeroCount();
+			int end = 256 - assignedPropertyBits.LeadingZeroCount();
+
+			int dest = 0;
+			for (int i = start; i < end; i++)
+			{
+				if (assignedPropertyBits.IsBitSet(i))
+					kinds[dest++] = (KnownPropertyKind)i;
+			}
+
+			return kinds;
+		}
 
 		/// <summary>
 		/// Make a "default" style for a child element.  This inherits the default-inheritable

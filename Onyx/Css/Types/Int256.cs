@@ -148,6 +148,10 @@ namespace Onyx.Css.Types
 			=> new UInt256(a._v1 & b._v1, a._v2 & b._v2, a._v3 & b._v3, a._v4 & b._v4);
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public bool Intersects(UInt256 other)
+			=> ((_v1 & other._v1) | (_v2 & other._v2) | (_v3 & other._v3) | (_v4 & other._v4)) != 0;
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UInt256 operator ^(UInt256 a, UInt256 b)
 			=> new UInt256(a._v1 ^ b._v1, a._v2 ^ b._v2, a._v3 ^ b._v3, a._v4 ^ b._v4);
 
@@ -386,6 +390,10 @@ namespace Onyx.Css.Types
 			=> obj is UInt256 other ? CompareTo(other) : 1;
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public int PopCount()
+			=> (int)(ulong.PopCount(_v1) + ulong.PopCount(_v2) + ulong.PopCount(_v3) + ulong.PopCount(_v4));
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public int LeadingZeroCount()
 			=>    _v4 != 0 ? (int)ulong.LeadingZeroCount(_v4)
 				: _v3 != 0 ? (int)ulong.LeadingZeroCount(_v3) + 64
@@ -618,7 +626,7 @@ namespace Onyx.Css.Types
 				chars[dest++] = n < 10 ? (char)('0' + n) : (char)('A' + (n - 10));
 			}
 
-			return new string(chars.Slice(dest));
+			return new string(chars.Slice(0, dest));
 		}
 
 		public static bool TryParse(ReadOnlySpan<char> text, out UInt256 value)
