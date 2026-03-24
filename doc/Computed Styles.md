@@ -313,6 +313,8 @@ public ComputedStyle WithBorderTopColor(Color32 color)
 
 Changing `border-top-color` thus copies three objects: the edge struct (8 bytes, inline), the `ComputedBorderStyle` (one allocation), and the `ComputedStyle` root (one allocation). Everything else — sizes, backgrounds, inherited styles, rare fields — is shared by reference with the original. This is the copy-on-write discipline in action: the cost is proportional to the depth of the changed property (2–3 levels), not to the total size of the style.
 
+Every `With*()` method on `ComputedStyle` also records the affected property in `AssignedPropertyBits` (see below). Sub-object `With*()` methods do not touch the bit set directly — only the root-level `ComputedStyle.With*()` methods do. Shorthand setters that affect multiple properties (e.g., `WithPadding()`) set all corresponding bits in a single `UInt256` OR operation, which is precomputed as a static field to avoid rebuilding the mask on every call.
+
 ### Default instances
 
 Every computed style class has a `static Default` property containing an instance with all CSS initial values. These defaults serve three purposes:
@@ -322,3 +324,54 @@ Every computed style class has a `static Default` property containing an instanc
 3. **`initial` keyword.** When a property is declared as `initial`, its value is copied from the corresponding default instance.
 
 Because defaults are shared singleton instances, the common case where most properties are at their initial values is very memory-efficient: multiple elements whose styles differ only in a few properties share most of the same sub-objects.
+
+### Property assignment tracking
+
+Each `ComputedStyle` carries a `UInt256 AssignedPropertyBits` field — a 256-bit integer where each bit position corresponds to one entry in the `KnownPropertyKind` enum. A bit is set when the corresponding property was explicitly applied to this style by a CSS rule or inline style declaration. Properties that are merely inherited from the parent, or left at their CSS initial values, do not set a bit.
+
+`MakeChildStyle()` always produces a child with `AssignedPropertyBits = UInt256.Zero`. Bits are accumulated as each winning property declaration is applied during step 7 of the computation pipeline (Apply properties to the computed style). By the time `GetComputedStyle()` returns, `AssignedPropertyBits` reflects exactly the properties that this element's own rules explicitly set.
+
+Three APIs are provided for querying the bit set:
+
+| API | Cost | Use |
+|-----|------|-----|
+| `IsPropertyAssigned(KnownPropertyKind)` | O(1), a few instructions, no allocation | Test one property |
+| `AnyPropertiesAssigned(params KnownPropertyKind[])` | O(n), short-circuits on first match | Test a small set of properties |
+| `AssignedProperties` | O(k) on first call, cached thereafter | Enumerate all assigned properties |
+
+For most uses — particularly in the box pipeline, where the goal is to classify what changed — `IsPropertyAssigned()` is the right tool. `AssignedProperties` exists for diagnostics and introspection; prefer the O(1) methods for any hot-path code.
+
+Two static conversion utilities round out the API:
+
+- `ConvertBitsToKnownProperties(UInt256)` — converts a bit set to a `KnownPropertyKind[]`. Used internally to implement the `AssignedProperties` lazy cache; also useful when a caller needs to enumerate the set members.
+- `ConvertKnownPropertiesToBits(IEnumerable<KnownPropertyKind>)` — converts a collection of property kinds to a `UInt256`. Useful for constructing masks to compare or combine with `AssignedPropertyBits`.
+
+### Style diffing
+
+`ComputedStyle.Diff(ComputedStyle other)` compares two computed styles and returns a `UInt256` bitmask where each set bit identifies a property whose value differs between the two styles. This is a proper deep comparison — every property value is tested — but the copy-on-write structure makes it efficient in practice.
+
+The implementation uses pointer equality as a fast path at every level of the tree. If `this == other` (same object reference), `Diff()` returns zero immediately. Otherwise, it delegates to each sub-object's own `Diff()` method, each of which also begins with a pointer-equality check:
+
+```
+ComputedStyle.Diff()
+  ├── if this == other → return zero
+  ├── Enums.Diff()       — compares the single backing ulong; if equal, returns zero
+  ├── Sizes.Diff()       — pointer check, then per-property comparison
+  ├── Background.Diff()  — pointer check, then per-property comparison
+  ├── Border.Diff()      — pointer check, then edge/radii sub-diffs
+  ├── Inherited.Diff()   — pointer check, then text/font/table/list/misc sub-diffs
+  └── RareFields.Diff()  — pointer check, then flex/pagebreak/outline/superrare sub-diffs
+```
+
+Because a typical style change touches only one or two sub-objects, most of those pointer checks will succeed and return zero without examining any individual properties. The cost of `Diff()` is therefore proportional to what actually changed, not to the total number of CSS properties.
+
+The return value is a `UInt256` in the same `KnownPropertyKind` bit-position encoding as `AssignedPropertyBits`. The box pipeline uses `Diff()` to classify what changed between a stale and a freshly computed style, and from that classification determines which downstream pipeline stages must run:
+
+| Changed properties | Pipeline consequence |
+|--------------------|---------------------|
+| `Display` changed | Box tree must be rebuilt for this element |
+| Any geometry property (width, height, margin, padding, border widths, font-size, line-height, etc.) | `InvalidateMeasure()` on the box; layout must re-run |
+| Visual-only properties (color, background-color, opacity, border-color, etc.) | Repaint only; layout is unaffected |
+| No properties changed | Nothing to do |
+
+This classification is what allows the render pass to skip layout entirely when only colors change, and to skip box reconstruction when only geometry changes.
