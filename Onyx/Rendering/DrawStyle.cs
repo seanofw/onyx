@@ -15,9 +15,6 @@ namespace Onyx.Rendering
 		/// <summary>Paint opacity, where 0.0 is fully transparent and 1.0 is fully opaque.</summary>
 		public double Opacity { get; }
 
-		/// <summary>The font used by DrawText, or null to let the renderer choose a default.</summary>
-		public IFont? Font { get; }
-
 		/// <summary>
 		/// The flat paint color, or null if a Brush is active. Color and Brush are mutually
 		/// exclusive; setting one via the constructor or a With*() method clears the other.
@@ -48,12 +45,11 @@ namespace Onyx.Rendering
 
 		/// <summary>
 		/// A sensible starting point: black, fully opaque, 1px solid stroke, identity
-		/// transform, no clip, no font. Build working styles from this using the With*() methods.
+		/// transform, no clip. Build working styles from this using the With*() methods.
 		/// </summary>
 		public static DrawStyle Default { get; } = new DrawStyle(
 			clip: null,
 			opacity: 1.0,
-			font: null,
 			color: Color32.Black,
 			brush: null,
 			brushRect: new Rect2d(
@@ -69,7 +65,6 @@ namespace Onyx.Rendering
 		/// </summary>
 		/// <param name="clip">The clip region. Null means no clipping.</param>
 		/// <param name="opacity">Paint opacity. 0.0 is fully transparent, 1.0 is fully opaque.</param>
-		/// <param name="font">The font for DrawText calls. Null lets the renderer choose a default.</param>
 		/// <param name="color">
 		/// The flat paint color. If set, brush is ignored regardless of the brush parameter.
 		/// </param>
@@ -93,7 +88,6 @@ namespace Onyx.Rendering
 		public DrawStyle(
 			IClipper? clip = null,
 			double opacity = 0.0,
-			IFont? font = null,
 			Color32? color = default,
 			IBrush? brush = null,
 			Rect2d brushRect = default,
@@ -103,7 +97,6 @@ namespace Onyx.Rendering
 		{
 			Clip = clip;
 			Opacity = opacity;
-			Font = font;
 			Color = color;
 			Brush = color.HasValue ? null : brush;
 			BrushRect = brushRect;
@@ -114,37 +107,34 @@ namespace Onyx.Rendering
 
 		/// <summary>Copy this object, replacing Clip.</summary>
 		public DrawStyle WithClip(IClipper? clip)
-			=> new DrawStyle(clip, Opacity, Font, Color, Brush, BrushRect, LineThickness, LineStyle, Transform);
+			=> new DrawStyle(clip, Opacity, Color, Brush, BrushRect, LineThickness, LineStyle, Transform);
 		/// <summary>Copy this object, replacing Opacity.</summary>
 		public DrawStyle WithOpacity(double opacity)
-			=> new DrawStyle(Clip, opacity, Font, Color, Brush, BrushRect, LineThickness, LineStyle, Transform);
-		/// <summary>Copy this object, replacing Font.</summary>
-		public DrawStyle WithFont(IFont? font)
-			=> new DrawStyle(Clip, Opacity, font, Color, Brush, BrushRect, LineThickness, LineStyle, Transform);
+			=> new DrawStyle(Clip, opacity, Color, Brush, BrushRect, LineThickness, LineStyle, Transform);
 		/// <summary>Copy this object, replacing Brush. Clears Color.</summary>
 		public DrawStyle WithBrush(IBrush? brush)
-			=> new DrawStyle(Clip, Opacity, Font, null, brush, BrushRect, LineThickness, LineStyle, Transform);
+			=> new DrawStyle(Clip, Opacity, null, brush, BrushRect, LineThickness, LineStyle, Transform);
 		/// <summary>Copy this object, replacing Color. Clears Brush.</summary>
 		public DrawStyle WithColor(Color32? color)
-			=> new DrawStyle(Clip, Opacity, Font, color, null, BrushRect, LineThickness, LineStyle, Transform);
+			=> new DrawStyle(Clip, Opacity, color, null, BrushRect, LineThickness, LineStyle, Transform);
 		/// <summary>Copy this object, replacing BrushRect.</summary>
 		public DrawStyle WithBrushRect(Rect2d brushRect)
-			=> new DrawStyle(Clip, Opacity, Font, Color, Brush, brushRect, LineThickness, LineStyle, Transform);
+			=> new DrawStyle(Clip, Opacity, Color, Brush, brushRect, LineThickness, LineStyle, Transform);
 		/// <summary>Copy this object, replacing Brush and BrushRect. Clears Color.</summary>
 		public DrawStyle WithBrush(IBrush? brush, Rect2d brushRect)
-			=> new DrawStyle(Clip, Opacity, Font, null, brush, brushRect, LineThickness, LineStyle, Transform);
+			=> new DrawStyle(Clip, Opacity, null, brush, brushRect, LineThickness, LineStyle, Transform);
 		/// <summary>Copy this object, replacing LineThickness.</summary>
 		public DrawStyle WithLineThickness(double lineThickness)
-			=> new DrawStyle(Clip, Opacity, Font, Color, Brush, BrushRect, lineThickness, LineStyle, Transform);
+			=> new DrawStyle(Clip, Opacity, Color, Brush, BrushRect, lineThickness, LineStyle, Transform);
 		/// <summary>Copy this object, replacing LineStyle.</summary>
 		public DrawStyle WithLineStyle(LineStyle lineStyle)
-			=> new DrawStyle(Clip, Opacity, Font, Color, Brush, BrushRect, LineThickness, lineStyle, Transform);
+			=> new DrawStyle(Clip, Opacity, Color, Brush, BrushRect, LineThickness, lineStyle, Transform);
 		/// <summary>Copy this object, replacing Transform.</summary>
 		public DrawStyle WithTransform(Matrix3x2d transform)
-			=> new DrawStyle(Clip, Opacity, Font, Color, Brush, BrushRect, LineThickness, LineStyle, transform);
+			=> new DrawStyle(Clip, Opacity, Color, Brush, BrushRect, LineThickness, LineStyle, transform);
 		/// <summary>Copy this object, replacing Transform, converting from a 3x3 matrix.</summary>
 		public DrawStyle WithTransform(Matrix3d transform)
-			=> new DrawStyle(Clip, Opacity, Font, Color, Brush, BrushRect, LineThickness, LineStyle,
+			=> new DrawStyle(Clip, Opacity, Color, Brush, BrushRect, LineThickness, LineStyle,
 				new Matrix3x2d(transform));
 	}
 }

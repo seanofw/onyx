@@ -13,15 +13,15 @@ namespace TestProgram
 	{
 		public static void Main(string[] args)
 		{
-			Window window = new Window(
-				title: "Hello, World",
-				size: new Size2i(640, 480),
-				minSize: new Size2i(160, 120),
-				maxSize: new Size2i(800, 600)
-			);
-			window.Show();
+			//Window window = new Window(
+			//	title: "Hello, World",
+			//	size: new Size2i(640, 480),
+			//	minSize: new Size2i(160, 120),
+			//	maxSize: new Size2i(800, 600)
+			//);
+			//window.Show();
 
-			WindowsMessageQueue.Run();
+			//WindowsMessageQueue.Run();
 
 			//Element div = new Element("div");
 			//div.InnerHtml = "<em><strong>This</strong> is a test</em>";
@@ -90,15 +90,17 @@ window {
 			document.MediaInfo = new MediaInfo(MediaType.Screen);
 
 			document.MediaDimensions = new MediaDimensions(
-				width: new Measure(Units.Pixels, 640),
+				width: new Measure(Units.Pixels, 320),
 				height: new Measure(Units.Pixels, 480)
 			);
 
 			Element? foo = document.Get("#foo");
 
+			List<ComputedStyle> computedStyles = new List<ComputedStyle>();
 			foreach (Element element in document.Find(".foo"))
 			{
 				ComputedStyle computedStyle = element.GetComputedStyle();
+				computedStyles.Add(computedStyle);
 			}
 		}
 	}

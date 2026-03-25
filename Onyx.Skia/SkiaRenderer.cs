@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Onyx.Css.Types;
 using Onyx.Rendering;
@@ -7,43 +6,37 @@ using SkiaSharp;
 
 namespace Onyx.Skia
 {
-	public class SkiaRenderer : IRenderer, IRenderables, IDisposable
+	public sealed class SkiaRenderer : SkiaDisposable, IRenderer, IRenderables
 	{
+		private readonly ISkiaRendererTypographyExtension _typographyExtension;
+		private readonly ISkiaRendererImageExtension _imageExtension;
+
 		private DrawStyle _lastDrawStyle = DrawStyle.Default;
 
 		private SKCanvas _canvas;
 		private SKPaint _paint;
-		private SKFont _defaultFont;
 		private SKRoundRect _roundRect;
-		private SKFont _currentFont;
 
-		public SkiaRenderer(SKCanvas canvas)
+		public SKCanvas Canvas => _canvas;
+
+		public SkiaRenderer(SKCanvas canvas, params ISkiaRendererExtension[] extensions)
 		{
 			_canvas = canvas;
 			_paint = new SKPaint();
 			_paint.IsAntialias = true;
-			_currentFont = _defaultFont = new SKFont(SKTypeface.CreateDefault(), 12);
 			_roundRect = new SKRoundRect();
+
+			_typographyExtension = extensions.OfType<ISkiaRendererTypographyExtension>().FirstOrDefault()
+				?? new DefaultSkiaTypography();
+
+			_imageExtension = extensions.OfType<ISkiaRendererImageExtension>().FirstOrDefault()
+				?? new DefaultSkiaImageHandling();
 		}
 
-		~SkiaRenderer()
-		{
-			Dispose(false);
-		}
-
-		public void Dispose()
-		{
-			Dispose(true);
-			GC.SuppressFinalize(this);
-		}
-
-		protected virtual void Dispose(bool isDisposing)
+		protected override void Dispose(bool isDisposing)
 		{
 			if (isDisposing)
 			{
-				_defaultFont?.Dispose();
-				_defaultFont = null!;
-
 				_roundRect?.Dispose();
 				_roundRect = null!;
 
@@ -62,26 +55,21 @@ namespace Onyx.Skia
 		public IClipper CreateClipper(ReadOnlySpan<Vector2d> convexPolygon)
 			=> new SkiaClipper(convexPolygon);
 
-		public IFont? CreateFont(FontInfo fontInfo, bool exactMatchOnly = false)
-			=> SkiaFont.Create(fontInfo, exactMatchOnly);
-
-		public IImage? CreateImage(string url)
-			=> throw new NotImplementedException();
-
 		public IBrush CreateLinearGradientBrush(LinearGradient linearGradient)
 			=> new SkiaLinearGradientBrush(linearGradient);
 
 		public IBrush CreateRadialGradientBrush(RadialGradient radialGradient)
 			=> throw new NotImplementedException();
 
+		public IFont? CreateFont(FontInfo fontInfo, bool exactMatchOnly = false)
+			=> _typographyExtension.CreateFont(this, fontInfo, exactMatchOnly);
+
+		public IImage? CreateImage(string url)
+			=> _imageExtension.CreateImage(this, url);
+
 		public void Clear(Color32 color)
 		{
 			_canvas.Clear(color.ToSKColor());
-		}
-
-		public void DrawImage(IImage image, Rect2d sourceRect, Vector2d dest, DrawStyle style)
-		{
-			throw new NotImplementedException();
 		}
 
 		public void DrawLines(ReadOnlySpan<Vector2d> points, bool closePolygon, DrawStyle style)
@@ -97,12 +85,16 @@ namespace Onyx.Skia
 			_paint.Style = SKPaintStyle.Fill;
 		}
 
-		public void DrawText(Vector2d topLeftCorner, ReadOnlySpan<char> text, DrawStyle style)
+		public void DrawImage(IImage image, Rect2d sourceRect, Rect2d destRect, DrawStyle style)
 		{
 			ApplyStyle(style);
+			_imageExtension.DrawImage(this, image, sourceRect, destRect, _paint, style);
+		}
 
-			SKTextBlob? textBlob = SKTextBlob.Create(text, _currentFont);
-			_canvas.DrawText(textBlob, (float)topLeftCorner.X, (float)topLeftCorner.Y, _paint);
+		public void DrawText(Vector2d topLeftCorner, IShapedText shapedText, DrawStyle style)
+		{
+			ApplyStyle(style);
+			_typographyExtension.DrawText(this, topLeftCorner, shapedText, _paint, style);
 		}
 
 		public void End()
@@ -171,7 +163,7 @@ namespace Onyx.Skia
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private void ApplyStyle(DrawStyle style)
+		public void ApplyStyle(DrawStyle style)
 		{
 			if (style == _lastDrawStyle)
 				return;
@@ -207,11 +199,6 @@ namespace Onyx.Skia
 			if (style.Transform != _lastDrawStyle.Transform)
 			{
 				_canvas.SetMatrix(style.Transform.ToSKMatrix());
-			}
-
-			if (style.Font != _lastDrawStyle.Font)
-			{
-				_currentFont = (style.Font as SkiaFont)?.Font ?? _defaultFont;
 			}
 
 			_lastDrawStyle = style;

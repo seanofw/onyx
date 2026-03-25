@@ -1,10 +1,9 @@
 using Onyx.Rendering;
-using Onyx.Types;
 using SkiaSharp;
 
 namespace Onyx.Skia
 {
-	public class SkiaFont : IFont
+	public class SkiaFont : SkiaDisposable, IFont
 	{
 		public FontInfo FontInfo { get; }
 
@@ -12,7 +11,7 @@ namespace Onyx.Skia
 
 		internal SKFont Font { get; }
 
-		public SkiaFont(FontInfo fontInfo, SKFont font)
+		private SkiaFont(FontInfo fontInfo, SKFont font)
 		{
 			FontInfo = fontInfo;
 			Font = font;
@@ -27,25 +26,14 @@ namespace Onyx.Skia
 				strikethroughPosition: font.Metrics.StrikeoutPosition ?? font.Metrics.XHeight - 1,
 				overlinePosition: font.Metrics.Ascent,
 
-				em: MeasureText("M").Size,
-				en: MeasureText("N").Size,
-				ex: MeasureText("x").Size,
-				space: MeasureText(" ").Size.Width
+				em: this.MeasureText("M").Size,
+				en: this.MeasureText("N").Size,
+				ex: this.MeasureText("x").Size,
+				space: this.MeasureText(" ").Size.Width
 			);
 		}
 
-		~SkiaFont()
-		{
-			Dispose(false);
-		}
-
-		public void Dispose()
-		{
-			Dispose(true);
-			GC.SuppressFinalize(this);
-		}
-
-		protected void Dispose(bool isDisposing)
+		protected override void Dispose(bool isDisposing)
 		{
 			if (isDisposing)
 			{
@@ -81,14 +69,7 @@ namespace Onyx.Skia
 			return new SkiaFont(fontInfo, font);
 		}
 
-		public TextMetrics MeasureText(ReadOnlySpan<char> text)
-		{
-			float advance = Font.MeasureText(text, out SKRect bounds);
-
-			return new TextMetrics(
-				new Rect2d(bounds.Left, bounds.Top, bounds.Width, bounds.Height),
-				new Vector2d(advance, 0)
-			);
-		}
+		public IShapedText ShapeText(ReadOnlySpan<char> text)
+			=> new SkiaShapedText(Font, text);
 	}
 }

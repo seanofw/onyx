@@ -66,14 +66,14 @@ namespace Onyx.Rendering
 		/// The top-left corner of the text bounding box in screen coordinates. This is not
 		/// the baseline position; use FontMetrics.Ascent to find the baseline from here.
 		/// </param>
-		/// <param name="text">
-		/// The characters to render. An empty span produces no output.
+		/// <param name="shapedText">
+		/// The text to render, which must be shaped text from a known font.
 		/// </param>
 		/// <param name="style">
 		/// The draw style. Font must be set; if it is null the renderer may substitute a
 		/// default font or produce no output.
 		/// </param>
-		void DrawText(Vector2d topLeftCorner, ReadOnlySpan<char> text, DrawStyle style);
+		void DrawText(Vector2d topLeftCorner, IShapedText shapedText, DrawStyle style);
 
 		/// <summary>
 		/// Draw a region of an image at a position on screen.
@@ -83,9 +83,10 @@ namespace Onyx.Rendering
 		/// The region of the image to sample, in image-local coordinates. Values outside
 		/// the image bounds are clamped or wrapped depending on the backend.
 		/// </param>
-		/// <param name="dest">The top-left destination point in screen coordinates.</param>
+		/// <param name="destRect">The destination rectangle in screen coordinates.
+		/// The image will be stretched or squashed as necessary to fit this rectangle.</param>
 		/// <param name="style">The draw style. Transform, Opacity, and Clip are applied.</param>
-		void DrawImage(IImage image, Rect2d sourceRect, Vector2d dest, DrawStyle style);
+		void DrawImage(IImage image, Rect2d sourceRect, Rect2d destRect, DrawStyle style);
 
 		/// <summary>
 		/// Fill a rectangle with rounded corners.
