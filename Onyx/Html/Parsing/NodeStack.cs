@@ -1,5 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-using Onyx.Html.Dom;
+using System.Runtime.CompilerServices;
 
 namespace Onyx.Html.Parsing
 {
@@ -8,14 +7,34 @@ namespace Onyx.Html.Parsing
 	/// but not yet closed (via end tags).
 	/// </summary>
 	internal ref struct NodeStack<T>
-		where T : Node
 	{
 		#region Private state
 
 		/// <summary>
+		/// The shape of each entry in the node stack.
+		/// </summary>
+		public struct Entry
+		{
+			public readonly T Node;
+			public readonly string Name;
+			public readonly SourceLocation SourceLocation;
+			public readonly int Depth;
+
+			public bool IsNull => Name == null!;
+
+			public Entry(T node, string name, SourceLocation sourceLocation, int depth)
+			{
+				Node = node;
+				Name = name;
+				SourceLocation = sourceLocation;
+				Depth = depth;
+			}
+		}
+
+		/// <summary>
 		/// The actual stack itself.
 		/// </summary>
-		private T[] _nodeStack;
+		private Entry[] _nodeStack;
 
 		#endregion
 
@@ -27,9 +46,9 @@ namespace Onyx.Html.Parsing
 		public int Count { get; private set; }
 
 		/// <summary>
-		/// The topmost node, which should never be null.
+		/// The topmost entry, which should never be null.
 		/// </summary>
-		public T CurrentNode { get; private set; }
+		public Entry Current { get; private set; }
 
 		#endregion
 
@@ -45,8 +64,8 @@ namespace Onyx.Html.Parsing
 		{
 			if (size < 1)
 				throw new ArgumentOutOfRangeException(nameof(size));
-			_nodeStack = new T[size];
-			CurrentNode = null!;
+			_nodeStack = new Entry[size];
+			Current = default!;
 			Count = 0;
 		}
 
@@ -62,7 +81,7 @@ namespace Onyx.Html.Parsing
 		public T this[int index]
 		{
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
-			get => _nodeStack[index];
+			get => _nodeStack[index].Node;
 		}
 
 		/// <summary>
@@ -70,17 +89,19 @@ namespace Onyx.Html.Parsing
 		/// to point at the new top of the stack.
 		/// </summary>
 		/// <param name="node">The node to push onto the stack.</param>
+		/// <param name="name">The name of that node.</param>
+		/// <param name="sourceLocation">The source location where that node is found.</param>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public void PushNode(T node)
+		public void PushNode(T node, string name, SourceLocation sourceLocation)
 		{
 			if (Count >= _nodeStack.Length)
 			{
-				T[] newStack = new T[_nodeStack.Length * 2];
+				Entry[] newStack = new Entry[_nodeStack.Length * 2];
 				_nodeStack.AsSpan().CopyTo(newStack);
 				_nodeStack = newStack;
 			}
-			_nodeStack[Count++] = node;
-			CurrentNode = node;
+			Current = _nodeStack[Count] = new Entry(node, name, sourceLocation, Count);
+			Count++;
 		}
 
 		/// <summary>
@@ -90,7 +111,7 @@ namespace Onyx.Html.Parsing
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public void PopNode()
 		{
-			CurrentNode = _nodeStack[--Count - 1];
+			Current = _nodeStack[--Count - 1];
 		}
 
 		/// <summary>
@@ -100,7 +121,7 @@ namespace Onyx.Html.Parsing
 		public void Clear()
 		{
 			Count = 0;
-			CurrentNode = null!;
+			Current = default!;
 		}
 
 		/// <summary>
@@ -110,13 +131,13 @@ namespace Onyx.Html.Parsing
 		/// <param name="searchFor">The set of node names (types) to search for.</param>
 		/// <returns>The first matching ancestor, if any, or null if none is found.</returns>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public T? FindAncestor(string[] searchFor)
+		public Entry FindAncestor(string[] searchFor)
 		{
 			for (int i = Count - 1; i >= 0; i--)
-				if (searchFor.Contains(_nodeStack[i].NodeName))
+				if (searchFor.Contains(_nodeStack[i].Name))
 					return _nodeStack[i];
 
-			return null;
+			return default;
 		}
 
 		#endregion
