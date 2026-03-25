@@ -112,4 +112,27 @@ namespace Onyx.Rendering
 		/// </param>
 		void DrawRoundRect(Rect2d rect, CornerRadii radii, DrawStyle style);
 	}
+
+	public static class IRendererExtensions
+	{
+		/// <summary>
+		/// Draw a run of text.
+		/// </summary>
+		/// <param name="topLeftCorner">
+		/// The top-left corner of the text bounding box in screen coordinates. This is not
+		/// the baseline position; use FontMetrics.Ascent to find the baseline from here.
+		/// </param>
+		/// <param name="font">The font to render the text with.</param>
+		/// <param name="text">The text to render.</param>
+		/// <param name="style">
+		/// The draw style. Font must be set; if it is null the renderer may substitute a
+		/// default font or produce no output.
+		/// </param>
+		public static void DrawText(this IRenderer renderer, Vector2d topLeftCorner,
+			IFont font, ReadOnlySpan<char> text, DrawStyle style)
+		{
+			using IShapedText shapedText = font.ShapeText(text);
+			renderer.DrawText(topLeftCorner, shapedText, style);
+		}
+	}
 }

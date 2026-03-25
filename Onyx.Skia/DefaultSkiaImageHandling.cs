@@ -24,7 +24,7 @@ namespace Onyx.Skia
 			paint.Color = Color32.Gray.ToSKColor();
 			paint.Shader = null;
 			paint.IsStroke = false;
-			renderer.Canvas.DrawRect(new SKRect((float)destRect.X, (float)destRect.Y, (float)sourceRect.Width, (float)sourceRect.Height), paint);
+			renderer.Canvas.DrawRect(new SKRect((float)destRect.X, (float)destRect.Y, (float)destRect.Width, (float)destRect.Height), paint);
 
 			paint.Color = Color32.Black.ToSKColor();
 			paint.IsStroke = true;
@@ -32,12 +32,12 @@ namespace Onyx.Skia
 			paint.StrokeCap = SKStrokeCap.Square;
 			paint.StrokeJoin = SKStrokeJoin.Miter;
 			paint.StrokeMiter = 1.0f;
-			renderer.Canvas.DrawRect(new SKRect((float)destRect.X, (float)destRect.Y, (float)sourceRect.Width, (float)sourceRect.Height), paint);
+			renderer.Canvas.DrawRect(new SKRect((float)destRect.X, (float)destRect.Y, (float)destRect.Width, (float)destRect.Height), paint);
 
 			renderer.Canvas.DrawLine(new SKPoint((float)destRect.X, (float)destRect.Y),
-				new SKPoint((float)(destRect.X + sourceRect.Width), (float)(destRect.Y + sourceRect.Height)), paint);
-			renderer.Canvas.DrawLine(new SKPoint((float)(destRect.X + sourceRect.Width), (float)destRect.Y),
-				new SKPoint((float)destRect.X, (float)(destRect.Y + sourceRect.Height)), paint);
+				new SKPoint((float)(destRect.X + destRect.Width), (float)(destRect.Y + destRect.Height)), paint);
+			renderer.Canvas.DrawLine(new SKPoint((float)(destRect.X + destRect.Width), (float)destRect.Y),
+				new SKPoint((float)destRect.X, (float)(destRect.Y + destRect.Height)), paint);
 		}
 	}
 }

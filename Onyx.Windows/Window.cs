@@ -1129,7 +1129,7 @@ namespace Onyx.Windows
 
 			using IBrush gradientBrush = new SkiaLinearGradientBrush(blueGradient);
 
-			DrawStyle style = DrawStyle.Default.WithFont(font!);
+			DrawStyle style = DrawStyle.Default;
 
 			renderer.FillRect(new Rect2d(100, 100, 200, 100), style.WithColor(Color32.CadetBlue));
 
@@ -1145,9 +1145,9 @@ namespace Onyx.Windows
 			DrawStyle blackStyle = style.WithColor(Color32.Black);
 
 			Vector2d lineStart = new Vector2d(10, 250);
-			renderer.DrawText(lineStart, "Hello, World.", blackStyle);
+			renderer.DrawText(lineStart, font!, "Hello, World.", blackStyle);
 			lineStart += new Vector2d(0, font!.FontMetrics.LineHeight);
-			renderer.DrawText(lineStart, "Goodbye, World.", blackStyle);
+			renderer.DrawText(lineStart, font!, "Goodbye, World.", blackStyle);
 
 			//---- End Document rendering.
 
