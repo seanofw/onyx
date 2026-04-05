@@ -2,20 +2,20 @@
 
 ## Overview
 
-The Onyx HTML parser is a standards-compliant HTML5 parser implemented entirely in managed C#. It takes raw HTML text as input, and it produces a DOM tree of `Node` objects as output. The parser is designed for Onyx's primary use case of building application UIs, not for rendering arbitrary web pages, so it focuses on body content and ignores metadata elements like `<head>` and `<title>`, which are simply treated as ordinary block elements.
+The Onyx HTML parser is a standards-compliant HTML5 parser implemented entirely in managed C#. It comes in two flavors: `HtmlParser`, which produces a DOM tree of Onyx `Node` objects, and `HtmlParser<TNode>`, a generic base class that follows the same HTML5 rules but can produce a tree of any type you supply. Both are designed for Onyx's primary use case of building application UIs, not for rendering arbitrary web pages, so they focus on body content and treat metadata elements like `<head>` and `<title>` as ordinary block elements.
 
 (If needed, you can write custom logic to evaluate `<head>` and its child elements for broader compatibility with existing web content.  As an example, see the section below on [Document titles](#document-titles).)
 
 The parser is split into two cooperating layers:
 
 - **`HtmlLexer`** — a low-level lexical analyzer that converts raw HTML text into a stream of `HtmlToken` objects (start tags, end tags, text, comments).
-- **`HtmlParser`** — a tree builder that consumes tokens from the lexer and assembles them into a DOM tree, applying HTML5 recovery rules for malformed markup along the way.
+- **`HtmlParser<TNode>`** — a generic tree builder that consumes tokens from the lexer and assembles them into a tree of any type, applying HTML5 recovery rules for malformed markup along the way. `HtmlParser` is the standard concrete subclass that produces Onyx `Node` objects.
 
 These two layers are always used together during parsing, but `HtmlLexer` can be used independently if you only need tokenization.
 
 > **Visibility conventions in this document:** Items marked *(internal)* are accessible within the Onyx assembly but are not part of the public API. Items marked *(private)* are implementation details of their containing class. Both are documented here for completeness, but external consumers of the library should not depend on them.
 
-### What the parser produces
+### What the standard parser produces
 
 A call to `HtmlParser.Parse()` returns a `Document` containing a tree of:
 
@@ -67,6 +67,37 @@ HtmlParser.ParseInnerHtml("<b>bold</b>", someElement);
 
 `ParseInnerHtml()` and `ParseOuterHtml()` are `internal static` methods. They are the mechanisms behind the `Element.InnerHtml` and `Element.OuterHtml` property setters, respectively. `ParseInnerHtml()` clears the target element's children and re-parses new HTML into it; `ParseOuterHtml()` parses HTML and returns a `DocumentFragment`. Both use a `[ThreadStatic]` `HtmlParser` instance — one per thread, created lazily — to avoid allocation overhead while remaining safe for concurrent use from different threads. External callers should use the `Element.InnerHtml` and `Element.OuterHtml` properties instead of calling these methods directly.
 
+### Using the generic parser
+
+If you want to parse HTML into your own object type rather than Onyx's `Node`/`Element` tree, derive from `HtmlParser<TNode>` or instantiate it directly with an `INodeCreator<TNode>`:
+
+```csharp
+// A simple record type for a lightweight scan.
+record MyNode(string Kind, string Text, List<MyNode> Children);
+
+class MyNodeCreator : INodeCreator<MyNode>
+{
+    public MyNode CreateElement(HtmlToken startTag)
+        => new MyNode("element", startTag.Text, new List<MyNode>());
+
+    public MyNode CreateText(string text, SourceLocation sourceLocation)
+        => new MyNode("text", text, new List<MyNode>());
+
+    public MyNode CreateComment(string text, SourceLocation sourceLocation)
+        => new MyNode("comment", text, new List<MyNode>());
+
+    public void AddChild(MyNode parent, MyNode newChild)
+        => parent.Children.Add(newChild);
+}
+
+HtmlParser<MyNode> parser = new HtmlParser<MyNode>(new MyNodeCreator());
+
+MyNode root = new MyNode("root", string.Empty, new List<MyNode>());
+parser.Parse("<p>Hello <b>world</b></p>", "test.html", root);
+```
+
+For full details on `HtmlParser<TNode>` and `INodeCreator<TNode>`, see [The Generic Parser](#the-generic-parser-htmlparsertnode) below.
+
 ### Using the lexer standalone
 
 ```csharp
@@ -95,17 +126,16 @@ The lexer can be useful on its own when you need to scan HTML without building a
   Raw HTML string
        │
        ▼
-  ┌───────────┐     HtmlToken stream     ┌──────────┐
-  │ HtmlLexer │ ───────────────────────► │HtmlParser│
-  └───────────┘                          └──────────┘
-                                              │
-                                              ▼
-                                     Document / DOM tree
-                                     (Element, TextNode,
-                                      CommentNode)
+  ┌───────────┐     HtmlToken stream     ┌──────────────────┐    INodeCreator<TNode>    ┌────────┐
+  │ HtmlLexer │ ───────────────────────► │ HtmlParser<TNode>│ ────────────────────────► │ TNode  │
+  └───────────┘                          └──────────────────┘                           └────────┘
+                                                 ▲
+                                          ┌──────┴──────┐
+                                          │  HtmlParser  │  (standard subclass: TNode = Node,
+                                          └─────────────┘   returns Document directly)
 ```
 
-The lexer is created by the parser and is not exposed to the caller. The parser reads tokens one at a time via `lexer.Next()`, and either attaches nodes to the tree or manipulates the open-element stack in response.
+The lexer is created by the parser and is not exposed to the caller. The parser reads tokens one at a time via `lexer.Next()`, and either calls `INodeCreator<TNode>` to create nodes or manipulates the open-element stack in response.
 
 ### Key classes
 
@@ -114,8 +144,10 @@ The lexer is created by the parser and is not exposed to the caller. The parser 
 | `HtmlLexer` | Tokenizes raw HTML text into `HtmlToken` objects. |
 | `HtmlToken` | An immutable token: a start tag, end tag, text chunk, or comment. |
 | `HtmlTokenKind` | Enum distinguishing token types: `StartTag`, `EndTag`, `Text`, `Comment`, `Eoi`. |
-| `HtmlParser` | Consumes tokens and builds a DOM tree, applying HTML5 error-recovery rules. |
-| `NodeStack<T>` | *(internal)* A stack of open `ContainerNode` objects used during tree construction. Not accessible outside the Onyx assembly. |
+| `HtmlParser<TNode>` | Generic tree builder: consumes tokens and assembles them into a `TNode` tree via `INodeCreator<TNode>`, applying HTML5 error-recovery rules. |
+| `INodeCreator<TNode>` | Factory interface that `HtmlParser<TNode>` calls to create elements, text nodes, and comment nodes, and to attach children. |
+| `HtmlParser` | Standard concrete subclass of `HtmlParser<Node>`. Constructs Onyx `Node`/`Element` trees; `Parse()` returns a `Document` directly. |
+| `NodeStack<T>` | *(internal)* A stack of open `TNode` objects used during tree construction. Not accessible outside the Onyx assembly. |
 
 ### Dependencies
 
@@ -259,6 +291,8 @@ The lexer supports one token of lookahead via `Peek()` and `Unget()`. The unget 
 
 ## The Parser (`HtmlParser`)
 
+`HtmlParser` is a concrete subclass of `HtmlParser<Node>` that uses an internal `DefaultNodeCreator` implementation to construct Onyx `Node`/`Element` trees. It also adds convenience `Parse()` overloads that return a `Document` directly, without requiring a pre-existing root node. For the underlying generic machinery shared with `HtmlParser<TNode>`, see [The Generic Parser](#the-generic-parser-htmlparsertnode) below.
+
 ### Construction
 
 ```csharp
@@ -271,9 +305,9 @@ A parser instance can be reused for multiple `Parse()` calls. The `Messages` col
 
 ### The parsing loop (`ParseTokens`)
 
-*(Private — documented for completeness.)*
+*(Protected — documented for completeness.)*
 
-The core of the parser is the private `ParseTokens()` method, which maintains a `NodeStack<ContainerNode>` — a stack of currently-open container nodes — and operates as a push-down automaton. The root node (either a `Document` or `DocumentFragment`) is always at the bottom of the stack.
+The core of the parser is the `protected` `ParseTokens()` method (defined in `HtmlParser<TNode>`), which maintains a `NodeStack<TNode>` — a stack of currently-open nodes — and operates as a push-down automaton. The root node is always at the bottom of the stack.
 
 For each token from the lexer:
 
@@ -287,16 +321,18 @@ For each token from the lexer:
    - Otherwise: the element is pushed onto the stack as the new current node.
 4. **`EndTag`** → If the tag name matches the current node's name, the current node is popped (clean close). Otherwise, `RecoverFromMismatchedEndTag()` is invoked to apply HTML5 recovery rules.
 
-### Element creation (`MakeElement`)
+### Element creation (`DefaultNodeCreator.CreateElement`)
 
 *(Private — documented for completeness.)*
 
-`MakeElement()` converts an `HtmlToken` into an `Element`:
+In the standard `HtmlParser`, element creation is handled by `DefaultNodeCreator.CreateElement()` (an internal implementation of `INodeCreator<Node>.CreateElement`):
 
 - The tag name is lowercased via `FastLowercase()`.
 - Attributes are stored in an `AttributeDictionary` backed by a `Dictionary<string, string>`.
 - Duplicate attribute names are resolved by keeping only the first occurrence (`TryAdd` semantics).
 - `Element.OnAttrChange()` is called for each attribute, which handles special attributes like `class` and `id`.
+
+In `HtmlParser<TNode>`, element creation is fully delegated to the `INodeCreator<TNode>` you supply — see [The Generic Parser](#the-generic-parser-htmlparsertnode).
 
 ### Auto-closing tags
 
@@ -313,6 +349,83 @@ These elements have their content consumed as raw text (no HTML parsing inside t
 * `script`, `style`, `xmp`, `plaintext`
 
 The closing tag is found by a case-insensitive search for the marker `</tagname>`. Everything between the start tag and the closing marker becomes a single `TextNode` child. This means HTML tags inside `<style>` or `<script>` are not parsed — they're just text.
+
+---
+
+## The Generic Parser (`HtmlParser<TNode>`)
+
+`HtmlParser<TNode>` is the base class that contains all HTML5 parsing and error-recovery logic. It is decoupled from Onyx's `Node`/`Element` types entirely — it can produce a tree of any reference type `TNode`, as long as you supply an `INodeCreator<TNode>` that knows how to construct nodes and attach children.
+
+Use `HtmlParser<TNode>` when you want full HTML5 parsing but your output type is not Onyx's `Node`:
+
+- A lightweight node type that carries only the fields you care about.
+- A third-party DOM, XML tree, or other hierarchical structure.
+- A testing harness that produces simple record types for easy assertions.
+- A scanning pass that discards everything except certain element names.
+
+The generic parser still uses the same HTML5 element-definition tables (`Element.AutoClosingTags`, `Element.RawContentTags`, `Element.BlockLevelElements`) to drive structural enforcement and auto-closing — your `TNode` type does not need to have any knowledge of these rules.
+
+### `INodeCreator<TNode>`
+
+`INodeCreator<TNode>` is the factory interface the parser calls to create nodes and build the tree. You must implement all four methods:
+
+| Method | Description |
+|---|---|
+| `CreateElement(HtmlToken startTag)` | Create a node for an HTML start tag. The token provides `Text` (tag name, already lowercased), `Attributes` (an ordered list of name/value pairs), and `SourceLocation`. |
+| `CreateText(string text, SourceLocation sourceLocation)` | Create a node for a run of plain text. The text is already HTML-entity-decoded. |
+| `CreateComment(string text, SourceLocation sourceLocation)` | Create a node for an HTML comment. The `<!--`/`-->` markers are already stripped. |
+| `AddChild(TNode parent, TNode newChild)` | Append `newChild` to the end of `parent`'s children. |
+
+Your implementations are not required to build an actual tree. You could discard comments in `CreateComment()`, build a flat list instead of a hierarchy, or record only a subset of elements — the parser only calls these four methods and does not inspect the resulting structure.
+
+### Construction
+
+```csharp
+HtmlParser<TNode> parser = new HtmlParser<TNode>(nodeCreator);
+```
+
+- `nodeCreator` — the `INodeCreator<TNode>` that the parser will call to create and connect nodes. Required.
+- `messages` — an optional `Messages` collection for warnings. If null, a new `Messages` is created. Accessible via `parser.Messages`.
+
+### Parsing
+
+The generic parser requires a pre-existing root node to attach parsed content to. Unlike `HtmlParser`, it does not construct the root itself:
+
+```csharp
+TNode root = /* your root node */;
+parser.Parse(htmlText, "filename.html", root);
+```
+
+Or, using a pre-constructed `HtmlLexer`:
+
+```csharp
+HtmlLexer lexer = new HtmlLexer(htmlText, "filename.html", parser.Messages);
+parser.Parse(lexer, root);
+```
+
+After parsing, `root`'s children (as populated by `INodeCreator<TNode>.AddChild`) contain the parsed tree.
+
+### Subclassing
+
+`HtmlParser<TNode>` exposes `ParseTokens()` as `protected`, so you can subclass it to add convenience methods analogous to what `HtmlParser` provides:
+
+```csharp
+class MyParser : HtmlParser<MyNode>
+{
+    public MyParser() : base(new MyNodeCreator()) { }
+
+    public MyNode Parse(string html, string filename)
+    {
+        MyNode root = new MyNode("root");
+        ParseTokens(new HtmlLexer(html, filename, Messages), root);
+        return root;
+    }
+}
+```
+
+### Relationship to `HtmlParser`
+
+`HtmlParser` is a concrete subclass of `HtmlParser<Node>` that supplies its own internal `DefaultNodeCreator` and adds overloads that return `Document` directly. If you need Onyx's standard `Node`/`Element` tree, use `HtmlParser` — there is no reason to instantiate `HtmlParser<Node>` directly.
 
 ---
 
@@ -411,7 +524,7 @@ The inclusion of these two elements is the only place where Onyx wilfully violat
 
 *(Internal — documented for completeness. Not accessible outside the Onyx assembly.)*
 
-`NodeStack<T>` is an `internal ref struct` (stack-allocated, cannot escape to the heap) that tracks which container nodes are currently open during parsing.
+`NodeStack<T>` is an `internal ref struct` (stack-allocated, cannot escape to the heap) that tracks which nodes are currently open during parsing. `T` is `TNode` in the generic parser — the stack is not constrained to any particular base type.
 
 - **`CurrentNode`** — the topmost node, to which new children are appended.
 - **`PushNode(T)`** — pushes a new open element.
