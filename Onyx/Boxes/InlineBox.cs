@@ -10,7 +10,7 @@ namespace Onyx.Boxes
 	/// on its children, optionally with line wrapping, and obeys the provided
 	/// alignment and wrapping modes.
 	/// </summary>
-	public class InlineBox : ContainerBox
+	public sealed class InlineBox : ContainerBox
 	{
 		public bool Wrap { get; }
 		public TextAlign Align { get; }
